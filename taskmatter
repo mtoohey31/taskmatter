@@ -13,7 +13,26 @@ from tabulate import tabulate
 DEFAULT_CONFIG = {'default_path': ['./'], 'default_subcommand': 'week'}
 
 
+def get_config() -> dict:
+    """Determine if the user has created a configuration file, merge it with the
+    default config, and return it."""
+    config_paths = [os.path.join(os.path.expanduser('~'),
+                                 '.config/taskmatter/config.yaml'),
+                    os.path.join(os.path.expanduser('~'),
+                                 '.config/taskmatter/config.yml')]
+    for path in config_paths:
+        if os.path.isfile(path):
+            with open(path, 'r') as file:
+                user_config = yaml.full_load(file)
+                if user_config is None:
+                    return DEFAULT_CONFIG
+                else:
+                    return {**DEFAULT_CONFIG, **user_config}
+    return DEFAULT_CONFIG
+
+
 def get_args() -> ap.Namespace:
+    """Get the arguments provided by the user at the command line."""
     config = get_config()
 
     parser = ap.ArgumentParser(prog="taskmatter",
@@ -47,7 +66,7 @@ def get_args() -> ap.Namespace:
 
     add_parser = subparsers.add_parser('add', aliases=['a'])
     add_parser.add_argument("title", nargs='+')
-    add_parser.set_defaults(func=add_task)
+    add_parser.set_defaults(func=add)
 
     edit_parser = subparsers.add_parser('edit', aliases=['e'])
     edit_parser.add_argument("ids", nargs='+')
@@ -62,36 +81,9 @@ def get_args() -> ap.Namespace:
     return parser.parse_args()
 
 
-def get_config() -> dict:
-    config_paths = [os.path.join(os.path.expanduser('~'),
-                                 '.config/taskmatter/config.yaml'),
-                    os.path.join(os.path.expanduser('~'),
-                                 '.config/taskmatter/config.yml')]
-    for path in config_paths:
-        if os.path.isfile(path):
-            with open(path, 'r') as file:
-                user_config = yaml.full_load(file)
-                if user_config is None:
-                    return DEFAULT_CONFIG
-                else:
-                    return {**DEFAULT_CONFIG, **user_config}
-    return DEFAULT_CONFIG
-
-
-def get_paths(paths: list[str], input_paths: list[str],
-              args: ap.Namespace) -> None:
-    for path in input_paths:
-        if os.path.isfile(path):
-            paths.append(path)
-        else:
-            for sub_path in os.listdir(path):
-                if os.path.isfile(sub_path):
-                    paths.append(sub_path)
-                elif args.recursive:
-                    get_paths(paths, [os.path.join(path, sub_path)], args)
-
-
 def get_fm(args: ap.Namespace) -> list[dict]:
+    """Using the get_paths helper function, find the selected files and read
+    their frontmatter, filtering out files that are not valid tasks."""
     paths = []
     get_paths(paths, args.paths, args)
 
@@ -112,9 +104,24 @@ def get_fm(args: ap.Namespace) -> list[dict]:
     return frontmatter_so_far
 
 
+def get_paths(paths: list[str], input_paths: list[str],
+              args: ap.Namespace) -> None:
+    """Using the provided arguments, determine which paths are potential tasks
+    in the scope of the user's command."""
+    for path in input_paths:
+        if os.path.isfile(path):
+            paths.append(path)
+        else:
+            for sub_path in os.listdir(path):
+                if os.path.isfile(sub_path):
+                    paths.append(sub_path)
+                elif args.recursive:
+                    get_paths(paths, [os.path.join(path, sub_path)], args)
+
+
 def get_info(path: str) -> Union[dict[str, str], None]:
-    """If the file matches the required patter, return a dict containing the
-    simple name the id of the file."""
+    """If the file matches the required pattern, return a dict containing the
+    title and id of the file."""
     stem = os.path.splitext(os.path.basename(path))[0]
 
     if re.match(r'^.* \| [a-z]{1,}$', stem):
@@ -125,11 +132,15 @@ def get_info(path: str) -> Union[dict[str, str], None]:
 
 
 def main() -> None:
+    """The main function of the program."""
     args = get_args()
     args.func(args)
 
 
 def week(args: ap.Namespace) -> None:
+    """The function corresponding to the `week` subcommand which prints the
+    incomplete tasks for this week, or all tasks for this week if `-a` is
+    specified."""
     frontmatter = get_fm(args)
 
     items = []
@@ -191,10 +202,15 @@ def week(args: ap.Namespace) -> None:
 
 
 def month(args: ap.Namespace) -> None:
+    """The function corresponding to the `month` subcommand which prints the
+    incomplete tasks for this month, or all tasks for this month if `-a` is
+    specified."""
     raise NotImplementedError
 
 
 def edit(args: ap.Namespace) -> None:
+    """The function corresponding to the `edit` subcommand that edits the tasks
+    with the given ids."""
     frontmatter = get_fm(args)
     for item_id in args.ids:
         for item in frontmatter:
@@ -202,11 +218,15 @@ def edit(args: ap.Namespace) -> None:
                 os.system('$EDITOR "' + item['path'] + '"')
 
 
-def add_task(args: ap.Namespace) -> None:
+def add(args: ap.Namespace) -> None:
+    """The function corresponding to the `add` command that creates a new task
+    with the given title."""
     raise NotImplementedError
 
 
 def task_done(args: ap.Namespace) -> None:
+    """The function corresponding to the `done` command that marks the tasks
+    with the given ids as done."""
     raise NotImplementedError
 
 
