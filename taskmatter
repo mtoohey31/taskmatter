@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+
+import os
+import re
+from typing import Union
+import argparse as ap
+import datetime
+from frontmatter import Frontmatter as fm
+import yaml
+import dateparser
+from tabulate import tabulate
+
+DEFAULT_CONFIG = {'default_path': ['./'], 'default_subcommand': 'week'}
+
+
+def get_args() -> ap.Namespace:
+    config = get_config()
+
+    parser = ap.ArgumentParser(prog="taskmatter",
+                               description='Process tasks in Markdown YAML '
+                               'frontmatter.')
+    subparsers = parser.add_subparsers(title='subcommands')
+    parser.set_defaults(func=week, all=None,
+                        paths=config['default_path'])
+
+    week_parser = subparsers.add_parser('week', aliases=['w'])
+    week_parser.add_argument(
+        "paths", nargs='*', default=config['default_path'])
+    week_parser.add_argument(
+        '-a', action=ap.BooleanOptionalAction, dest="all")
+    week_parser.add_argument(
+        '-r', action=ap.BooleanOptionalAction, dest="recursive")
+    week_parser.add_argument(
+        '-w', action=ap.BooleanOptionalAction, dest="raw")
+    week_parser.set_defaults(func=week)
+
+    month_parser = subparsers.add_parser('month', aliases=['m'])
+    month_parser.add_argument(
+        "paths", nargs='*', default=config['default_path'])
+    month_parser.add_argument(
+        '-a', action=ap.BooleanOptionalAction, dest="all")
+    month_parser.add_argument(
+        '-r', action=ap.BooleanOptionalAction, dest="recursive")
+    month_parser.add_argument(
+        '-w', action=ap.BooleanOptionalAction, dest="raw")
+    month_parser.set_defaults(func=month)
+
+    add_parser = subparsers.add_parser('add', aliases=['a'])
+    add_parser.add_argument("title", nargs='+')
+    add_parser.set_defaults(func=add_task)
+
+    edit_parser = subparsers.add_parser('edit', aliases=['e'])
+    edit_parser.add_argument("ids", nargs='+')
+    edit_parser.add_argument(
+        '-r', action=ap.BooleanOptionalAction, dest="recursive")
+    edit_parser.set_defaults(func=edit)
+
+    done_parser = subparsers.add_parser('done', aliases=['d'])
+    done_parser.add_argument("titles", nargs='+')
+    done_parser.set_defaults(func=task_done)
+
+    return parser.parse_args()
+
+
+def get_config() -> dict:
+    config_paths = [os.path.join(os.path.expanduser('~'),
+                                 '.config/taskmatter/config.yaml'),
+                    os.path.join(os.path.expanduser('~'),
+                                 '.config/taskmatter/config.yml')]
+    for path in config_paths:
+        if os.path.isfile(path):
+            with open(path, 'r') as file:
+                user_config = yaml.full_load(file)
+                if user_config is None:
+                    return DEFAULT_CONFIG
+                else:
+                    return {**DEFAULT_CONFIG, **user_config}
+    return DEFAULT_CONFIG
+
+
+def get_paths(paths: list[str], input_paths: list[str],
+              args: ap.Namespace) -> None:
+    for path in input_paths:
+        if os.path.isfile(path):
+            paths.append(path)
+        else:
+            for sub_path in os.listdir(path):
+                if os.path.isfile(sub_path):
+                    paths.append(sub_path)
+                elif args.recursive:
+                    get_paths(paths, [os.path.join(path, sub_path)], args)
+
+
+def get_fm(args: ap.Namespace) -> list[dict]:
+    paths = []
+    get_paths(paths, args.paths, args)
+
+    info = {file: get_info(file) for file in paths}
+    tm_files = [file for file in paths if os.path.isfile(
+        file) and os.path.splitext(file)[1] == '.md' and info[file] is not None]
+
+    frontmatter_so_far = []
+    for tm_file in tm_files:
+        curr_frontmatter = fm.read_file(tm_file)['attributes']
+        if curr_frontmatter is not None and '_tm' in curr_frontmatter:
+
+            frontmatter_so_far.append({**{"path": tm_file}, **info[tm_file],
+                                       **curr_frontmatter['_tm']})
+        else:
+            frontmatter_so_far.append({**{"path": tm_file}, **info[tm_file]})
+
+    return frontmatter_so_far
+
+
+def get_info(path: str) -> Union[dict[str, str], None]:
+    """If the file matches the required patter, return a dict containing the
+    simple name the id of the file."""
+    stem = os.path.splitext(os.path.basename(path))[0]
+
+    if re.match(r'^.* \| [a-z]{1,}$', stem):
+        return {"title": re.sub(r' \| [a-z]+$', '', stem),
+                "id": re.sub(r'^.* \| (?=[a-z]+$)', '', stem)}
+    else:
+        return None
+
+
+def main() -> None:
+    args = get_args()
+    args.func(args)
+
+
+def week(args: ap.Namespace) -> None:
+    frontmatter = get_fm(args)
+
+    items = []
+    for item in frontmatter:
+        if not args.all and "done" in item and item['done']:
+            continue
+
+        if 'planned' in item:
+            date = dateparser.parse(item['planned'])
+        elif 'due' in item:
+            date = dateparser.parse(item['due'])
+        else:
+            continue
+
+        items.append((item['title'] + ' | ' + item['id'], date))
+
+    today = datetime.datetime.today()
+    weekday = today.isoweekday() % 7
+    week_start = datetime.datetime(
+        today.year, today.month, today.day - weekday)
+
+    this_week = {}
+    for day_offset in range(7):
+        day_start = week_start + datetime.timedelta(days=day_offset)
+        day_end = week_start + datetime.timedelta(days=day_offset + 1)
+        sorted_items = sorted([item for item in items
+                               if day_start < item[1] < day_end],
+                              key=lambda x: x[1]) + \
+            [item for item in items if item[1] == day_start]
+
+        formatted_items = []
+        for item in sorted_items:
+            if item[1].time() != datetime.time.min:
+                formatted_items.append(
+                    item[0] + ' - ' + item[1].strftime('%-I:%M:%S %p'))
+            else:
+                formatted_items.append(item[0])
+
+        this_week[day_start.strftime('%A, %b %-d')] = formatted_items
+
+    for key in [(week_start +
+                 datetime.timedelta(days=offset)).strftime('%A, %b %-d')
+                for offset in range(7)]:
+        if not this_week[key]:
+            this_week.pop(key)
+        else:
+            break
+
+    for key in [(week_start +
+                 datetime.timedelta(days=offset)).strftime('%A, %b %-d')
+                for offset in reversed(range(0, 7))]:
+        if key in this_week and not this_week[key]:
+            this_week.pop(key)
+        elif key not in this_week:
+            print('No tasks found')
+            return None
+
+    print(tabulate(this_week, headers='keys'))
+
+
+def month(args: ap.Namespace) -> None:
+    raise NotImplementedError
+
+
+def edit(args: ap.Namespace) -> None:
+    frontmatter = get_fm(args)
+    for item_id in args.ids:
+        for item in frontmatter:
+            if item['id'] == item_id:
+                os.system('$EDITOR "' + item['path'] + '"')
+
+
+def add_task(args: ap.Namespace) -> None:
+    raise NotImplementedError
+
+
+def task_done(args: ap.Namespace) -> None:
+    raise NotImplementedError
+
+
+if __name__ == '__main__':
+    main()

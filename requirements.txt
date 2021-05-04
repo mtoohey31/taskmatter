@@ -1,0 +1,4 @@
+argparse==1.4.0
+dateparser==1.0.0
+tabulate==0.8.9
+git+git://github.com/jonbeebe/frontmatter/@accd644#frontmatter=frontmatter
