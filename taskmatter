@@ -10,6 +10,7 @@ import datetime as dt
 import frontmatter as fm
 import yaml
 import dateparser as dp
+from dateparser.date import DateDataParser as ddp
 
 DEFAULT_CONFIG = {'default_path': ['./'], 'default_subcommand': 'week'}
 
@@ -313,7 +314,31 @@ def add(args: ap.Namespace) -> None:
     while id in [info[file]['id'] for file in info]:
         id = ''.join([chr(rd.randint(97, 122)) for _ in range(3)])
 
-    props = {prop.split(':')[0]: prop.split(':')[1] for prop in args.props}
+    props = {}
+    for prop in args.props:
+        if len(prop.split(':')) == 2:
+            key, value = prop.split(':')
+        else:
+            key = prop.split(':')[0]
+            value = ':'.join(prop.split(':')[1:])
+
+        parser = ddp(settings={'RETURN_TIME_AS_PERIOD': True})
+        date = parser.get_date_data(value)
+        if date.date_obj is None and key in ['planned', 'due']:
+            raise ValueError(
+                f'Provided `{key}` value could not be parsed as a date')
+        elif date.date_obj is None:
+            props[key] = value
+        else:
+            if date.period == 'time':
+                if date.date_obj.second == 0:
+                    props[key] = date.date_obj.strftime(
+                        '%B %-d, %Y, %-I:%M %p')
+                else:
+                    props[key] = date.date_obj.strftime(
+                        '%B %-d, %Y, %-I:%M:%S %p')
+            else:
+                props[key] = date.date_obj.strftime('%B %-d, %Y')
 
     f = BytesIO()
     if props:
