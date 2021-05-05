@@ -3,6 +3,8 @@
 import os
 import re
 from typing import Union, Any
+from io import BytesIO
+import random as rd
 import argparse as ap
 import datetime as dt
 import frontmatter as fm
@@ -64,18 +66,20 @@ def get_args() -> ap.Namespace:
     month_parser.set_defaults(func=month)
 
     add_parser = subparsers.add_parser('add', aliases=['a'])
-    add_parser.add_argument("title", nargs='+')
+    add_parser.add_argument("title")
+    add_parser.add_argument("props", nargs="*")
+    add_parser.set_defaults(recursive=False)
     add_parser.set_defaults(func=add)
 
     edit_parser = subparsers.add_parser('edit', aliases=['e'])
-    edit_parser.add_argument("ids", nargs='+')
+    edit_parser.add_argument("targets", nargs='+')
     edit_parser.add_argument(
         '-r', action=ap.BooleanOptionalAction, dest="recursive")
     edit_parser.set_defaults(func=edit)
 
     done_parser = subparsers.add_parser('done', aliases=['d'])
-    done_parser.add_argument("titles", nargs='+')
-    done_parser.set_defaults(func=task_done)
+    done_parser.add_argument("targets", nargs='+')
+    done_parser.set_defaults(func=done)
 
     return parser.parse_args()
 
@@ -220,29 +224,170 @@ def month(args: ap.Namespace) -> None:
     """The function corresponding to the `month` subcommand which prints the
     incomplete tasks for this month, or all tasks for this month if `-a` is
     specified."""
-    raise NotImplementedError
-
-
-def edit(args: ap.Namespace) -> None:
-    """The function corresponding to the `edit` subcommand that edits the tasks
-    with the given ids."""
     frontmatter = get_fm(args)
-    for item_id in args.ids:
-        for item in frontmatter:
-            if item['id'] == item_id:
-                os.system('$EDITOR "' + item['path'] + '"')
+
+    today = dt.datetime.today()
+    month_start = dt.datetime(today.year, today.month, 1)
+    month_end = dt.datetime(today.year, today.month % 12 +
+                            1, 1) - dt.timedelta(days=1)
+
+    month = []
+    dropped_days = []
+
+    for day_offset in range(month_end.day):
+        day_start = month_start + dt.timedelta(days=day_offset)
+        day_end = month_start + dt.timedelta(days=day_offset + 1)
+        sorted_tasks = sorted([task for task in frontmatter if
+                               ('done' not in task or not task['done']
+                                or args.all) and
+                               (('planned' in task and
+                                day_start < dp.parse(task['planned']) < day_end) or
+                                ('planned' not in task and 'due' in task and
+                                day_start < dp.parse(task['due']) < day_end))],
+                              key=lambda x: x['planned'] if 'planned' in x else x['due']) + \
+            [task for task in frontmatter if
+             ('done' not in task or not task['done'] or args.all) and
+             (('planned' in task and dp.parse(task['planned']) == day_start) or
+              ('planned' not in task and 'due' in task
+               and dp.parse(task['due']) == day_start))]
+
+        formatted_tasks = []
+
+        for task in sorted_tasks:
+            task_str_so_far = task['id'] + ' - ' + task['title']
+            task_time = dp.parse(
+                task['planned'] if 'planned' in task else task['due']).time()
+            if task_time != dt.time.min:
+                task_str_so_far += ' - ' + task_time.strftime('%-I:%M:%S %p')
+            formatted_tasks.append(task_str_so_far)
+
+        if formatted_tasks:
+            month.extend([{'day': day, 'tasks': []} for day in dropped_days])
+            dropped_days = []
+            month.append({'day': day_start.strftime(
+                ' %A, %b %-d '), 'tasks': formatted_tasks})
+        elif month:
+            dropped_days.append(day_start.strftime(' %A, %b %-d '))
+
+    if month:
+        print(month)
+        print(_format_month_table(month))
+    else:
+        print('No tasks found')
+
+
+def _format_month_table(week: list[dict[str, Any]]) -> str:
+    block_height = max([len(day['tasks']) for day in week], default=0)
+    for day in week:
+        day['tasks'].extend([''] * (block_height - len(day['tasks'])))
+    for day in week:
+        day['width'] = max([len(task)
+                           for task in day['tasks']] + [len(day['day'])])
+        day['day'] = day['day'] + ' ' * (day['width'] - len(day['day']))
+        for i in range(len(day['tasks'])):
+            day['tasks'][i] = day['tasks'][i] + ' ' * \
+                (day['width'] - len(day['tasks'][i]))
+
+    table_so_far = '┌' + '┬'.join(['─' * day['width'] for day in week]) + '┐'
+    table_so_far += '\n│' + '│'.join([day['day'] for day in week]) + '│'
+    table_so_far += '\n├' + \
+        '┼'.join(['─' * day['width'] for day in week]) + '┤'
+    for i in range(block_height):
+        table_so_far += '\n│' + \
+            '│'.join([day['tasks'][i] for day in week]) + '│'
+
+    table_so_far += '\n└' + \
+        '┴'.join(['─' * day['width'] for day in week]) + '┘'
+    return table_so_far
 
 
 def add(args: ap.Namespace) -> None:
     """The function corresponding to the `add` command that creates a new task
     with the given title."""
-    raise NotImplementedError
+    paths = []
+    get_paths(paths, args.paths, args)
+
+    info = {file: get_info(file) for file in paths}
+
+    id = ''.join([chr(rd.randint(97, 122)) for _ in range(3)])
+    while id in [info[file]['id'] for file in info]:
+        id = ''.join([chr(rd.randint(97, 122)) for _ in range(3)])
+
+    props = {prop.split(':')[0]: prop.split(':')[1] for prop in args.props}
+
+    f = BytesIO()
+    if props:
+        fm.dump(fm.Post(f'# {args.title}', **{'_tm': props}), f)
+    else:
+        fm.dump(fm.Post(f'# {args.title}', **{'_tm': None}), f)
+
+    with open(f'./{args.title} | {id}.md', 'w') as file:
+        file.write(f.getvalue().decode('utf8') + '\n')
 
 
-def task_done(args: ap.Namespace) -> None:
+def edit(args: ap.Namespace) -> None:
+    """The function corresponding to the `edit` subcommand that edits the tasks
+    with the given ids/paths."""
+    frontmatter = get_fm(args)
+    for target in args.targets:
+        if re.match(r'^[a-z]{3}$', target):
+            for item in frontmatter:
+                if item['id'] == target:
+                    os.system('$EDITOR "' + item['path'] + '"')
+                    break
+            else:
+                print(f'No task with id: "{target}" found')
+        elif os.path.exists(target):
+            os.system('$EDITOR "' + target + '"')
+        else:
+            print(f'Could not parse task "{target}"')
+
+
+def done(args: ap.Namespace) -> None:
     """The function corresponding to the `done` command that marks the tasks
-    with the given ids as done."""
-    raise NotImplementedError
+    with the given ids/paths as done."""
+    frontmatter = get_fm(args)
+    for target in args.targets:
+        if re.match(r'^[a-z]{3}$', target):
+            for item in frontmatter:
+                if item['id'] == target:
+                    f = BytesIO()
+                    file_fm = fm.load(item['path'])
+                    if '_tm' in file_fm and \
+                            (isinstance(file_fm['_tm'], dict)
+                             or file_fm['_tm'] is None):
+                        file_fm['_tm']['done'] = True
+                    elif '_tm' in file_fm:
+                        raise ValueError(
+                            f'{target} contains unsupported `_tm` key')
+                    else:
+                        file_fm['_tm'] = {'done': True}
+                    fm.dump(file_fm, f)
+
+                    with open(item['path'], 'w') as file:
+                        file.write(f.getvalue().decode('utf8') + '\n')
+
+                    break
+            else:
+                print(f'No task with id: "{target}" found')
+        elif os.path.exists(target):
+            f = BytesIO()
+            file_fm = fm.load(target)
+            if '_tm' in file_fm and \
+                    (isinstance(file_fm['_tm'], dict)
+                     or file_fm['_tm'] is None):
+                file_fm['_tm']['done'] = True
+            elif '_tm' in file_fm:
+                raise ValueError(
+                    f'{target} contains unsupported `_tm` key')
+            else:
+                file_fm['_tm'] = {'done': True}
+            fm.dump(file_fm, f)
+
+            with open(target, 'w') as file:
+                file.write(f.getvalue().decode('utf8') + '\n')
+        else:
+            print(f'Could not parse task "{target}"')
 
 
 if __name__ == '__main__':
