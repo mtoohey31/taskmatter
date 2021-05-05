@@ -5,7 +5,7 @@ import re
 from typing import Union, Any
 import argparse as ap
 import datetime as dt
-from frontmatter import Frontmatter as fm
+import frontmatter as fm
 import yaml
 import dateparser as dp
 
@@ -38,7 +38,7 @@ def get_args() -> ap.Namespace:
                                description='Process tasks in Markdown YAML '
                                'frontmatter.')
     subparsers = parser.add_subparsers(title='subcommands')
-    parser.set_defaults(func=week, all=None,
+    parser.set_defaults(func=week, all=None, recursive=None,
                         paths=config['default_path'])
 
     week_parser = subparsers.add_parser('week', aliases=['w'])
@@ -88,11 +88,12 @@ def get_fm(args: ap.Namespace) -> list[dict]:
 
     info = {file: get_info(file) for file in paths}
     tm_files = [file for file in paths if os.path.isfile(
-        file) and os.path.splitext(file)[1] == '.md' and info[file] is not None]
+        file) and os.path.splitext(file)[1] in ['.md', '.pmd', '.rmd', '.Rmd']
+        and info[file] is not None]
 
     frontmatter_so_far = []
     for tm_file in tm_files:
-        curr_frontmatter = fm.read_file(tm_file)['attributes']
+        curr_frontmatter = fm.load(tm_file)
         if curr_frontmatter is not None and '_tm' in curr_frontmatter:
 
             frontmatter_so_far.append({**{"path": tm_file}, **info[tm_file],
@@ -123,9 +124,9 @@ def get_info(path: str) -> Union[dict[str, str], None]:
     title and id of the file."""
     stem = os.path.splitext(os.path.basename(path))[0]
 
-    if re.match(r'^.* \| [a-z]{1,}$', stem):
-        return {"title": re.sub(r' \| [a-z]+$', '', stem),
-                "id": re.sub(r'^.* \| (?=[a-z]+$)', '', stem)}
+    if re.match(r'^.* \| [a-z]{3}$', stem):
+        return {"title": re.sub(r' \| [a-z]{3}$', '', stem),
+                "id": re.sub(r'^.* \| (?=[a-z]{3}$)', '', stem)}
     else:
         return None
 
@@ -152,17 +153,24 @@ def week(args: ap.Namespace) -> None:
     for day_offset in range(7):
         day_start = week_start + dt.timedelta(days=day_offset)
         day_end = week_start + dt.timedelta(days=day_offset + 1)
-        sorted_tasks = sorted([task for task in frontmatter
-                               if 'planned' in task and
-                               day_start < dp.parse(task['planned']) < day_end],
+        sorted_tasks = sorted([task for task in frontmatter if
+                               ('done' not in task or not task['done']
+                                or args.all) and
+                               (('planned' in task and
+                                day_start < dp.parse(task['planned']) < day_end) or
+                                ('planned' not in task and 'due' in task and
+                                day_start < dp.parse(task['due']) < day_end))],
                               key=lambda x: x['planned'] if 'planned' in x else x['due']) + \
-            [task for task in frontmatter if 'planned' in task and dp.parse(
-                task['planned']) == day_start]
+            [task for task in frontmatter if
+             ('done' not in task or not task['done'] or args.all) and
+             (('planned' in task and dp.parse(task['planned']) == day_start) or
+              ('planned' not in task and 'due' in task
+               and dp.parse(task['due']) == day_start))]
 
         formatted_tasks = []
 
         for task in sorted_tasks:
-            task_str_so_far = task['id'] + ' - ' + task['title']
+            task_str_so_far = task['title'] + ' - ' + task['id']
             task_time = dp.parse(
                 task['planned'] if 'planned' in task else task['due']).time()
             if task_time != dt.time.min:
@@ -171,16 +179,20 @@ def week(args: ap.Namespace) -> None:
 
         if formatted_tasks:
             week.extend([{'day': day, 'tasks': []} for day in dropped_days])
+            dropped_days = []
             week.append({'day': day_start.strftime(
-                '%A, %b %-d'), 'tasks': formatted_tasks})
+                ' %A, %b %-d '), 'tasks': formatted_tasks})
         elif week:
-            dropped_days.append(day_start.strftime('%A, %b %-d'))
+            dropped_days.append(day_start.strftime(' %A, %b %-d '))
 
-    _format_week_table(week)
+    if week:
+        print(_format_week_table(week))
+    else:
+        print('No tasks found')
 
 
-def _format_week_table(week: list[dict[str, Any]]) -> None:
-    block_height = max(len(day['tasks']) for day in week)
+def _format_week_table(week: list[dict[str, Any]]) -> str:
+    block_height = max([len(day['tasks']) for day in week], default=0)
     for day in week:
         day['tasks'].extend([''] * (block_height - len(day['tasks'])))
     for day in week:
@@ -191,7 +203,6 @@ def _format_week_table(week: list[dict[str, Any]]) -> None:
             day['tasks'][i] = day['tasks'][i] + ' ' * \
                 (day['width'] - len(day['tasks'][i]))
 
-    total_width = sum(day['width'] for day in week) + len(week) + 1
     table_so_far = '┌' + '┬'.join(['─' * day['width'] for day in week]) + '┐'
     table_so_far += '\n│' + '│'.join([day['day'] for day in week]) + '│'
     table_so_far += '\n├' + \
@@ -202,7 +213,7 @@ def _format_week_table(week: list[dict[str, Any]]) -> None:
 
     table_so_far += '\n└' + \
         '┴'.join(['─' * day['width'] for day in week]) + '┘'
-    print(table_so_far)
+    return table_so_far
 
 
 def month(args: ap.Namespace) -> None:
