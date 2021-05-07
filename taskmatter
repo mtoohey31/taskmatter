@@ -12,30 +12,40 @@ import yaml
 import dateparser as dp
 from dateparser.date import DateDataParser as ddp
 
-DEFAULT_CONFIG = {'default_path': ['./'], 'default_subcommand': 'week'}
+DEFAULT_CONFIG = {'default_path': ['./']}
 
 
-def get_config() -> dict:
+def _get_config() -> dict:
     """Determine if the user has created a configuration file, merge it with the
     default config, and return it."""
+    # Expand the potential config paths
     config_paths = [os.path.join(os.path.expanduser('~'),
                                  '.config/taskmatter/config.yaml'),
                     os.path.join(os.path.expanduser('~'),
                                  '.config/taskmatter/config.yml')]
+    # Check each config path
     for path in config_paths:
+        # If the file exists...
         if os.path.isfile(path):
+            # ...then read it, load the yaml content, and if it is non-empty,
+            # merge it with the default config
             with open(path, 'r') as file:
                 user_config = yaml.full_load(file)
                 if user_config is None:
                     return DEFAULT_CONFIG
                 else:
+                    # TODO: Add more advanced configuration options, and
+                    # implement more advanced configuration merging to account
+                    # for nested data structures in the yaml
                     return {**DEFAULT_CONFIG, **user_config}
+
+    # If no config paths were found, just return the default config
     return DEFAULT_CONFIG
 
 
-def get_args() -> ap.Namespace:
+def _get_args() -> ap.Namespace:
     """Get the arguments provided by the user at the command line."""
-    config = get_config()
+    config = _get_config()
 
     parser = ap.ArgumentParser(prog="taskmatter",
                                description='Process tasks in Markdown YAML '
@@ -87,60 +97,86 @@ def get_args() -> ap.Namespace:
     return parser.parse_args()
 
 
-def get_fm(args: ap.Namespace) -> list[dict]:
-    """Using the get_paths helper function, find the selected files and read
+def _get_fm(args: ap.Namespace) -> list[dict]:
+    """Using the _get_paths helper function, find the selected files and read
     their frontmatter, filtering out files that are not valid tasks."""
     paths = []
-    get_paths(paths, args.paths, args)
+    _get_paths(paths, args.paths, args)
 
-    info = {file: get_info(file) for file in paths}
+    info = {file: _get_info(file) for file in paths}
+    # Filter the files by those whose info was found and who have the proper
+    # extensions.
     tm_files = [file for file in paths if os.path.isfile(
         file) and os.path.splitext(file)[1] in ['.md', '.pmd', '.rmd', '.Rmd']
         and info[file] is not None]
 
+    # Load the frontmatter for each file and create a dictionary including the
+    # file's path, title, and id
     frontmatter_so_far = []
     for tm_file in tm_files:
         curr_frontmatter = fm.load(tm_file)
         if curr_frontmatter is not None and '_tm' in curr_frontmatter:
 
-            frontmatter_so_far.append({**{"path": tm_file}, **info[tm_file],
-                                       **curr_frontmatter['_tm']})
+            frontmatter_so_far.append({**curr_frontmatter['_tm'],
+                                       **{"__path__": tm_file},
+                                       **info[tm_file]})
         else:
-            frontmatter_so_far.append({**{"path": tm_file}, **info[tm_file]})
+            frontmatter_so_far.append(
+                {**{"__path__": tm_file}, **info[tm_file]})
 
     return frontmatter_so_far
 
 
-def get_paths(paths: list[str], input_paths: list[str],
-              args: ap.Namespace) -> None:
+def _get_paths(paths: list[str], input_paths: list[str],
+               args: ap.Namespace) -> None:
     """Using the provided arguments, determine which paths are potential tasks
     in the scope of the user's command."""
+    # NOTE: this function could be simplified by only using a single for loop
+    # and calling itself recursively faster, but then the recursive argument
+    # couldn't be used correctly while also beling able to specify both
+    # directories and files in the arguments
+
+    # Check each provided path
     for path in input_paths:
+        # Check whether the path is a file
         if os.path.isfile(path):
             paths.append(path)
         else:
+            # If it's not a file, iterate through each path inside the
+            # directory
             for sub_path in os.listdir(path):
+                # If the path is a file, add it to the paths
                 if os.path.isfile(sub_path):
                     paths.append(sub_path)
+                # Otherwise, if the recursive argument was passed, call this
+                # method recursively
                 elif args.recursive:
-                    get_paths(paths, [os.path.join(path, sub_path)], args)
+                    _get_paths(paths, [os.path.join(path, sub_path)], args)
 
 
-def get_info(path: str) -> Union[dict[str, str], None]:
+def _get_info(path: str) -> Union[dict[str, str], None]:
     """If the file matches the required pattern, return a dict containing the
     title and id of the file."""
+    # Strip the directories and extension from the path
     stem = os.path.splitext(os.path.basename(path))[0]
 
+    # TODO: Check for id conflicts here and resolve them with a helper function
+
+    # Check if the stem matches the regex for an id
     if re.match(r'^.* \| [a-z]{3}$', stem):
-        return {"title": re.sub(r' \| [a-z]{3}$', '', stem),
-                "id": re.sub(r'^.* \| (?=[a-z]{3}$)', '', stem)}
+        return {"__title__": re.sub(r' \| [a-z]{3}$', '', stem),
+                "__id__": re.sub(r'^.* \| (?=[a-z]{3}$)', '', stem)}
     else:
         return None
 
 
-def main() -> None:
+def _main() -> None:
     """The main function of the program."""
-    args = get_args()
+    # TODO: Refactor so that the provided args are passed to the functions as
+    # actual arguments instead of as a single object, so that taskmatter can
+    # be imported, and the public functions called directly without having to
+    # create an argparse.Namespace object
+    args = _get_args()
     args.func(args)
 
 
@@ -148,7 +184,10 @@ def week(args: ap.Namespace) -> None:
     """The function corresponding to the `week` subcommand which prints the
     incomplete tasks for this week, or all tasks for this week if `-a` is
     specified."""
-    frontmatter = get_fm(args)
+    # TODO: Handle repeated tasks
+    # TODO: Refactor into multiple helper functions
+
+    frontmatter = _get_fm(args)
 
     today = dt.datetime.today()
     weekday = today.isoweekday()
@@ -161,6 +200,7 @@ def week(args: ap.Namespace) -> None:
     for day_offset in range(7):
         day_start = week_start + dt.timedelta(days=day_offset)
         day_end = week_start + dt.timedelta(days=day_offset + 1)
+        # TODO: Handle intervals better with DateDataParser to get period
         sorted_tasks = sorted([task for task in frontmatter if
                                ('done' not in task or not task['done']
                                 or args.all) and
@@ -178,7 +218,7 @@ def week(args: ap.Namespace) -> None:
         formatted_tasks = []
 
         for task in sorted_tasks:
-            task_str_so_far = task['title'] + ' - ' + task['id']
+            task_str_so_far = task['__title__'] + ' - ' + task['__id__']
             task_time = dp.parse(
                 task['planned'] if 'planned' in task else task['due']).time()
             if task_time != dt.time.min:
@@ -228,7 +268,10 @@ def month(args: ap.Namespace) -> None:
     """The function corresponding to the `month` subcommand which prints the
     incomplete tasks for this month, or all tasks for this month if `-a` is
     specified."""
-    frontmatter = get_fm(args)
+    # TODO: Handle repeated tasks
+    # TODO: Refactor into multiple helper functions
+
+    frontmatter = _get_fm(args)
 
     today = dt.datetime.today()
     month_start_weekday = dt.datetime(today.year, today.month +
@@ -257,6 +300,7 @@ def month(args: ap.Namespace) -> None:
         for day_offset in range(7):
             day_start = week_start + dt.timedelta(days=day_offset)
             day_end = week_start + dt.timedelta(days=day_offset + 1)
+            # TODO: Handle intervals better with DateDataParser to get period
             sorted_tasks = sorted([task for task in frontmatter if
                                    ('done' not in task or not task['done']
                                     or args.all) and
@@ -274,7 +318,7 @@ def month(args: ap.Namespace) -> None:
             formatted_tasks = []
 
             for task in sorted_tasks:
-                task_str_so_far = task['title'] + ' - ' + task['id']
+                task_str_so_far = task['__title__'] + ' - ' + task['__id__']
                 task_time = dp.parse(
                     task['planned'] if 'planned' in task else task['due']).time()
                 if task_time != dt.time.min:
@@ -340,30 +384,56 @@ def _format_month_table(month: list[dict[str, Any]], weekdays: list[dict],
 def add(args: ap.Namespace) -> None:
     """The function corresponding to the `add` command that creates a new task
     with the given title."""
+    # Get all the paths within the current directory
     paths = []
-    get_paths(paths, args.paths, args)
+    _get_paths(paths, ['./'], args)
 
-    info = {file: get_info(file) for file in paths}
+    # Also get the info regarding each of the paths within the current directory
+    info = {file: _get_info(file) for file in paths}
 
+    # Create a random id and check that it is not already present in the
+    # current directory. It is possible to run into id conflicts with this
+    # method, as the length of ids is quite low to keep filenames readable,
+    # however, even if we were to check recursively or even in parent
+    # directories for objects with similar names, there would still be a
+    # possibility of id conflicts when adding task lists from other computers
+    # for example, so they have to be resolved by the list methods.
     id = ''.join([chr(rd.randint(97, 122)) for _ in range(3)])
-    while id in [info[file]['id'] for file in info]:
+    while id in [info[file]['__id__'] for file in info]:
         id = ''.join([chr(rd.randint(97, 122)) for _ in range(3)])
 
     props = {}
+    # Iterate through each provided prop in the arguments
     for prop in args.props:
-        if len(prop.split(':')) == 2:
-            key, value = prop.split(':')
+        split_props = re.split(r'(?<!\\):', prop)
+        # Test if the properties arguments can be suitably divided by `:`
+        # Raise an error if it does not have enough divisions
+        if len(split_props) < 2:
+            raise ValueError('Properties key and value arguments must be '
+                             'separated by `:`')
+        # Otherwise, assign the key and value variables, removing whitespace
+        # from the ends
+        elif len(split_props) == 2:
+            key, value = [s.strip() for s in split_props]
         else:
-            key = prop.split(':')[0]
-            value = ':'.join(prop.split(':')[1:])
+            key = split_props[0].strip()
+            value = ':'.join(split_props[1:]).strip()
 
+        # Attempt to parse the value as a date, including the time as a period
         parser = ddp(settings={'RETURN_TIME_AS_PERIOD': True})
         date = parser.get_date_data(value)
+        # Only raise an error if the date cannot be parsed if the property is
+        # 'planned' or 'due'
         if date.date_obj is None and key in ['planned', 'due']:
             raise ValueError(
                 f'Provided `{key}` value could not be parsed as a date')
+        # Otherwise, if it wasn't one of those properties and could not be
+        # parsed, simply continue with the property as the raw string
         elif date.date_obj is None:
             props[key] = value
+        # Otherwise, if it was successfully parsed return a string, formatted
+        # to match the period of date so that unnecessarily precise values are
+        # not included
         else:
             if date.period == 'time':
                 if date.date_obj.second == 0:
@@ -375,6 +445,8 @@ def add(args: ap.Namespace) -> None:
             else:
                 props[key] = date.date_obj.strftime('%B %-d, %Y')
 
+    # Dump the properties to a file, setting the contents to a level 1 ATX
+    # header that is the title of the task
     f = BytesIO()
     if props:
         fm.dump(fm.Post(f'# {args.title}', **{'_tm': props}), f)
@@ -387,32 +459,57 @@ def add(args: ap.Namespace) -> None:
 
 def edit(args: ap.Namespace) -> None:
     """The function corresponding to the `edit` subcommand that edits the tasks
-    with the given ids/paths."""
-    frontmatter = get_fm(args)
+    with the given targets."""
+    # TODO: Handle recursive/non-recursive possibilities better by starting
+    # with a non-recursive check, informing the user if that did not succeed,
+    # then proceeding to a recursive check
+    frontmatter = _get_fm(args)
+
+    # Iterate through each target provided
     for target in args.targets:
+        # First check if the target is an id, if so, use the gathered
+        # frontmatter to find the corresponding path
         if re.match(r'^[a-z]{3}$', target):
             for item in frontmatter:
-                if item['id'] == target:
-                    os.system('$EDITOR "' + item['path'] + '"')
+                if item['__id__'] == target:
+                    # Once the id has been found, try to use the shell's visual
+                    # or editor variables to edit the files
+                    os.system('$VISUAL "' + item['__path__'] + '" || $EDITOR "'
+                              + item['__path__'] + '"')
                     break
             else:
+                # If the id is never found, inform the user
                 print(f'No task with id: "{target}" found')
+        # If the target is not an id, but is a valid path, edit it
         elif os.path.exists(target):
-            os.system('$EDITOR "' + target + '"')
+            os.system(f'$VISUAL "{target}" || $EDITOR "{target}"')
+        # Otherwise if none of the above worked, inform the user that the
+        # target was not found
         else:
-            print(f'Could not parse task "{target}"')
+            print(f'Could not find task "{target}"')
 
 
 def done(args: ap.Namespace) -> None:
     """The function corresponding to the `done` command that marks the tasks
-    with the given ids/paths as done."""
-    frontmatter = get_fm(args)
+    with the given targets as done."""
+    # TODO: Handle recursive/non-recursive possibilities better by starting
+    # with a non-recursive check, informing the user if that did not succeed,
+    # then proceeding to a recursive check
+    frontmatter = _get_fm(args)
+
+    # Iterate through each target provided
     for target in args.targets:
+        # First check if the target is an id, if so, use the gathered
+        # frontmatter to find the corresponding path
         if re.match(r'^[a-z]{3}$', target):
             for item in frontmatter:
-                if item['id'] == target:
+                if item['__id__'] == target:
+                    # Once the target has been found, load the file with then
+                    # frontmatter module, merge a `done: true` property with
+                    # the frontmatter's `_tm` property, or inform the user
+                    # if this was not possible, then write the file
                     f = BytesIO()
-                    file_fm = fm.load(item['path'])
+                    file_fm = fm.load(item['__path__'])
                     if '_tm' in file_fm and \
                             (isinstance(file_fm['_tm'], dict)
                              or file_fm['_tm'] is None):
@@ -424,12 +521,14 @@ def done(args: ap.Namespace) -> None:
                         file_fm['_tm'] = {'done': True}
                     fm.dump(file_fm, f)
 
-                    with open(item['path'], 'w') as file:
+                    with open(item['__path__'], 'w') as file:
                         file.write(f.getvalue().decode('utf8') + '\n')
 
                     break
             else:
                 print(f'No task with id: "{target}" found')
+        # If the target is not an id, but is a valid path, use the same logic
+        # as in the past case to merge properties and write the file
         elif os.path.exists(target):
             f = BytesIO()
             file_fm = fm.load(target)
@@ -446,9 +545,11 @@ def done(args: ap.Namespace) -> None:
 
             with open(target, 'w') as file:
                 file.write(f.getvalue().decode('utf8') + '\n')
+        # Otherwise if none of the above worked, inform the user that the
+        # target was not found
         else:
             print(f'Could not parse task "{target}"')
 
 
 if __name__ == '__main__':
-    main()
+    _main()
