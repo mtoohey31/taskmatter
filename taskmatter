@@ -47,6 +47,7 @@ def get_args() -> ap.Namespace:
     week_parser = subparsers.add_parser('week', aliases=['w'])
     week_parser.add_argument(
         "paths", nargs='*', default=config['default_path'])
+    week_parser.add_argument('-n', dest="next", default=0)
     week_parser.add_argument(
         '-a', action=ap.BooleanOptionalAction, dest="all")
     week_parser.add_argument(
@@ -58,6 +59,7 @@ def get_args() -> ap.Namespace:
     month_parser = subparsers.add_parser('month', aliases=['m'])
     month_parser.add_argument(
         "paths", nargs='*', default=config['default_path'])
+    month_parser.add_argument('-n', dest="next", default=0)
     month_parser.add_argument(
         '-a', action=ap.BooleanOptionalAction, dest="all")
     month_parser.add_argument(
@@ -149,8 +151,9 @@ def week(args: ap.Namespace) -> None:
     frontmatter = get_fm(args)
 
     today = dt.datetime.today()
-    weekday = today.isoweekday() % 7
-    week_start = dt.datetime(today.year, today.month, today.day - weekday)
+    weekday = today.isoweekday()
+    week_start = dt.datetime(today.year, today.month,
+                             today.day - weekday + (7 * int(args.next)))
 
     week = []
     dropped_days = []
@@ -186,9 +189,9 @@ def week(args: ap.Namespace) -> None:
             week.extend([{'day': day, 'tasks': []} for day in dropped_days])
             dropped_days = []
             week.append({'day': day_start.strftime(
-                ' %A, %b %-d '), 'tasks': formatted_tasks})
+                '%A, %b %-d'), 'tasks': formatted_tasks})
         elif week:
-            dropped_days.append(day_start.strftime(' %A, %b %-d '))
+            dropped_days.append(day_start.strftime('%A, %b %-d'))
 
     if week:
         print(_format_week_table(week))
@@ -228,77 +231,109 @@ def month(args: ap.Namespace) -> None:
     frontmatter = get_fm(args)
 
     today = dt.datetime.today()
-    month_start = dt.datetime(today.year, today.month, 1)
-    month_end = dt.datetime(today.year, today.month % 12 +
-                            1, 1) - dt.timedelta(days=1)
+    month_start_weekday = dt.datetime(today.year, today.month +
+                                      int(args.next), 1).isoweekday()
+    month_start = dt.datetime(
+        today.year, today.month + int(args.next), 1) - dt.timedelta(days=month_start_weekday)
+    month_end_weekday = (dt.datetime(today.year, (today.month + int(args.next)) % 12 +
+                                     1, 1) - dt.timedelta(days=1)).isoweekday()
+    month_end = (dt.datetime(today.year, (today.month + int(args.next)) % 12 +
+                             1, 1) + dt.timedelta(days=6 - month_end_weekday))
+
+    curr_sunday = month_start
+    sundays = [curr_sunday]
+    curr_sunday += dt.timedelta(days=7)
+    while curr_sunday < month_end:
+        sundays.append(curr_sunday)
+        curr_sunday += dt.timedelta(days=7)
 
     month = []
-    dropped_days = []
+    dropped_weeks = []
 
-    for day_offset in range(month_end.day):
-        day_start = month_start + dt.timedelta(days=day_offset)
-        day_end = month_start + dt.timedelta(days=day_offset + 1)
-        sorted_tasks = sorted([task for task in frontmatter if
-                               ('done' not in task or not task['done']
-                                or args.all) and
-                               (('planned' in task and
-                                day_start < dp.parse(task['planned']) < day_end) or
-                                ('planned' not in task and 'due' in task and
-                                day_start < dp.parse(task['due']) < day_end))],
-                              key=lambda x: x['planned'] if 'planned' in x else x['due']) + \
-            [task for task in frontmatter if
-             ('done' not in task or not task['done'] or args.all) and
-             (('planned' in task and dp.parse(task['planned']) == day_start) or
-              ('planned' not in task and 'due' in task
-               and dp.parse(task['due']) == day_start))]
+    for week_start in sundays:
 
-        formatted_tasks = []
+        week = []
 
-        for task in sorted_tasks:
-            task_str_so_far = task['id'] + ' - ' + task['title']
-            task_time = dp.parse(
-                task['planned'] if 'planned' in task else task['due']).time()
-            if task_time != dt.time.min:
-                task_str_so_far += ' - ' + task_time.strftime('%-I:%M:%S %p')
-            formatted_tasks.append(task_str_so_far)
+        for day_offset in range(7):
+            day_start = week_start + dt.timedelta(days=day_offset)
+            day_end = week_start + dt.timedelta(days=day_offset + 1)
+            sorted_tasks = sorted([task for task in frontmatter if
+                                   ('done' not in task or not task['done']
+                                    or args.all) and
+                                   (('planned' in task and
+                                    day_start < dp.parse(task['planned']) < day_end) or
+                                    ('planned' not in task and 'due' in task and
+                                    day_start < dp.parse(task['due']) < day_end))],
+                                  key=lambda x: x['planned'] if 'planned' in x else x['due']) + \
+                [task for task in frontmatter if
+                 ('done' not in task or not task['done'] or args.all) and
+                 (('planned' in task and dp.parse(task['planned']) == day_start) or
+                  ('planned' not in task and 'due' in task
+                   and dp.parse(task['due']) == day_start))]
 
-        if formatted_tasks:
-            month.extend([{'day': day, 'tasks': []} for day in dropped_days])
-            dropped_days = []
-            month.append({'day': day_start.strftime(
-                ' %A, %b %-d '), 'tasks': formatted_tasks})
-        elif month:
-            dropped_days.append(day_start.strftime(' %A, %b %-d '))
+            formatted_tasks = []
 
-    if month:
-        print(month)
-        print(_format_month_table(month))
-    else:
-        print('No tasks found')
+            for task in sorted_tasks:
+                task_str_so_far = task['title'] + ' - ' + task['id']
+                task_time = dp.parse(
+                    task['planned'] if 'planned' in task else task['due']).time()
+                if task_time != dt.time.min:
+                    task_str_so_far += ' - ' + \
+                        task_time.strftime('%-I:%M:%S %p')
+                formatted_tasks.append(task_str_so_far)
+
+            week.append({'day': day_start.strftime(
+                '%-d'), 'tasks': formatted_tasks})
+
+        month.append(week)
+
+    print(_format_month_table(month,
+                              [{'day': (month_start +
+                                dt.timedelta(days=i)).strftime('%A')}
+                               for i in range(7)], today.strftime('%B')))
 
 
-def _format_month_table(week: list[dict[str, Any]]) -> str:
-    block_height = max([len(day['tasks']) for day in week], default=0)
-    for day in week:
-        day['tasks'].extend([''] * (block_height - len(day['tasks'])))
-    for day in week:
-        day['width'] = max([len(task)
-                           for task in day['tasks']] + [len(day['day'])])
-        day['day'] = day['day'] + ' ' * (day['width'] - len(day['day']))
-        for i in range(len(day['tasks'])):
-            day['tasks'][i] = day['tasks'][i] + ' ' * \
-                (day['width'] - len(day['tasks'][i]))
+def _format_month_table(month: list[dict[str, Any]], weekdays: list[dict],
+                        month_name: str) -> str:
+    for week in month:
+        block_height = max([len(day['tasks']) for day in week], default=0)
+        for day in week:
+            day['tasks'].extend([''] * (block_height - len(day['tasks'])))
 
-    table_so_far = '┌' + '┬'.join(['─' * day['width'] for day in week]) + '┐'
-    table_so_far += '\n│' + '│'.join([day['day'] for day in week]) + '│'
+    for i in range(7):
+        weekdays[i]['width'] = max(
+            max([len(task) for task in week[i]['tasks']] +
+                [len(week[i]['day'])] + [len(weekdays[i]['day'])])
+            for week in month)
+        weekdays[i]['day'] += ' ' * \
+            (weekdays[i]['width'] - len(weekdays[i]['day']))
+        for week in month:
+            week[i]['day'] += ' ' * \
+                (weekdays[i]['width'] - len(week[i]['day']))
+            for j in range(len(week[i]['tasks'])):
+                week[i]['tasks'][j] += ' ' * \
+                    (weekdays[i]['width'] - len(week[i]['tasks'][j]))
+
+    total_width = sum([weekday['width'] for weekday in weekdays]) + 8
+    table_so_far = '┌' + '─' * (total_width - 2) + '┐'
+    table_so_far += '\n│' + month_name + ' ' * \
+        (total_width - 2 - len(month_name)) + '│'
     table_so_far += '\n├' + \
-        '┼'.join(['─' * day['width'] for day in week]) + '┤'
-    for i in range(block_height):
+        '┬'.join(['─' * weekday['width'] for weekday in weekdays]) + '┤'
+    table_so_far += '\n│' + '│'.join([weekday['day']
+                                     for weekday in weekdays]) + '│'
+    for week in month:
+        table_so_far += '\n├' + \
+            '┼'.join(['─' * weekday['width'] for weekday in weekdays]) + '┤'
         table_so_far += '\n│' + \
-            '│'.join([day['tasks'][i] for day in week]) + '│'
-
+            '│'.join([task['day'] for task in week]) + '│'
+        if len(week[0]['tasks']) != 0:
+            for i in range(len(week[0]['tasks'])):
+                table_so_far += '\n│' + \
+                    '│'.join([task['tasks'][i] for task in week]) + '│'
     table_so_far += '\n└' + \
-        '┴'.join(['─' * day['width'] for day in week]) + '┘'
+        '┴'.join(['─' * weekday['width'] for weekday in weekdays]) + '┘'
+
     return table_so_far
 
 
