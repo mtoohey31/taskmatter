@@ -334,7 +334,10 @@ def month(args: ap.Namespace) -> None:
     print(_format_month_table(month,
                               [{'day': (month_start +
                                 dt.timedelta(days=i)).strftime('%A')}
-                               for i in range(7)], today.strftime('%B')))
+                               for i in range(7)],
+                              dt.datetime(year=today.year,
+                                          month=today.month + int(args.next),
+                                          day=1).strftime('%B')))
 
 
 def _format_month_table(month: list[dict[str, Any]], weekdays: list[dict],
