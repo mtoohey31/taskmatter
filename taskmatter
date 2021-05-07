@@ -51,8 +51,8 @@ def _get_args() -> ap.Namespace:
                                description='Process tasks in Markdown YAML '
                                'frontmatter.')
     subparsers = parser.add_subparsers(title='subcommands')
-    parser.set_defaults(func=week, all=None, recursive=None,
-                        paths=config['default_path'])
+    parser.set_defaults(func=week, next=0, all=None, recursive=None,
+                        notrim=None, paths=config['default_path'])
 
     week_parser = subparsers.add_parser('week', aliases=['w'])
     week_parser.add_argument(
@@ -63,7 +63,7 @@ def _get_args() -> ap.Namespace:
     week_parser.add_argument(
         '-r', action=ap.BooleanOptionalAction, dest="recursive")
     week_parser.add_argument(
-        '-w', action=ap.BooleanOptionalAction, dest="raw")
+        '-T', action=ap.BooleanOptionalAction, dest="notrim")
     week_parser.set_defaults(func=week)
 
     month_parser = subparsers.add_parser('month', aliases=['m'])
@@ -75,7 +75,7 @@ def _get_args() -> ap.Namespace:
     month_parser.add_argument(
         '-r', action=ap.BooleanOptionalAction, dest="recursive")
     month_parser.add_argument(
-        '-w', action=ap.BooleanOptionalAction, dest="raw")
+        '-T', action=ap.BooleanOptionalAction, dest="notrim")
     month_parser.set_defaults(func=month)
 
     add_parser = subparsers.add_parser('add', aliases=['a'])
@@ -180,6 +180,17 @@ def _main() -> None:
     args.func(args)
 
 
+def _format_task(task: dict[str, Any]) -> str:
+    task_str_so_far = '[' + task['__id__'] + '] ' + task['__title__']
+    task_time = dp.parse(
+        task['planned'] if 'planned' in task else task['due']).time()
+    if task_time != dt.time.min:
+        task_str_so_far += ' - ' + \
+            task_time.strftime('%-I:%M:%S %p')
+
+    return task_str_so_far
+
+
 def week(args: ap.Namespace) -> None:
     """The function corresponding to the `week` subcommand which prints the
     incomplete tasks for this week, or all tasks for this week if `-a` is
@@ -195,7 +206,6 @@ def week(args: ap.Namespace) -> None:
                              today.day - weekday + (7 * int(args.next)))
 
     week = []
-    dropped_days = []
 
     for day_offset in range(7):
         day_start = week_start + dt.timedelta(days=day_offset)
@@ -218,20 +228,17 @@ def week(args: ap.Namespace) -> None:
         formatted_tasks = []
 
         for task in sorted_tasks:
-            task_str_so_far = task['__title__'] + ' - ' + task['__id__']
-            task_time = dp.parse(
-                task['planned'] if 'planned' in task else task['due']).time()
-            if task_time != dt.time.min:
-                task_str_so_far += ' - ' + task_time.strftime('%-I:%M:%S %p')
-            formatted_tasks.append(task_str_so_far)
+            formatted_tasks.append(_format_task(task))
 
-        if formatted_tasks:
-            week.extend([{'day': day, 'tasks': []} for day in dropped_days])
-            dropped_days = []
-            week.append({'day': day_start.strftime(
-                '%A, %b %-d'), 'tasks': formatted_tasks})
-        elif week:
-            dropped_days.append(day_start.strftime('%A, %b %-d'))
+        week.append({'day': day_start.strftime(
+            '%A, %b %-d'), 'tasks': formatted_tasks})
+
+    if not args.notrim:
+        while week and not week[0]['tasks']:
+            week.pop(0)
+
+        while week and not week[-1]['tasks']:
+            week.pop()
 
     if week:
         print(_format_week_table(week))
@@ -291,7 +298,6 @@ def month(args: ap.Namespace) -> None:
         curr_sunday += dt.timedelta(days=7)
 
     month = []
-    dropped_weeks = []
 
     for week_start in sundays:
 
@@ -318,26 +324,42 @@ def month(args: ap.Namespace) -> None:
             formatted_tasks = []
 
             for task in sorted_tasks:
-                task_str_so_far = task['__title__'] + ' - ' + task['__id__']
-                task_time = dp.parse(
-                    task['planned'] if 'planned' in task else task['due']).time()
-                if task_time != dt.time.min:
-                    task_str_so_far += ' - ' + \
-                        task_time.strftime('%-I:%M:%S %p')
-                formatted_tasks.append(task_str_so_far)
+                formatted_tasks.append(_format_task(task))
 
             week.append({'day': day_start.strftime(
                 '%-d'), 'tasks': formatted_tasks})
 
         month.append(week)
 
-    print(_format_month_table(month,
-                              [{'day': (month_start +
-                                dt.timedelta(days=i)).strftime('%A')}
-                               for i in range(7)],
-                              dt.datetime(year=today.year,
-                                          month=today.month + int(args.next),
-                                          day=1).strftime('%B')))
+    weekdays = [{'day': (month_start + dt.timedelta(days=i)).strftime('%A')}
+                for i in range(7)]
+
+    if not args.notrim:
+        while month and not any(week[0]['tasks'] for week in month):
+            for week in month:
+                week.pop(0)
+            weekdays.pop(0)
+
+        while month and not any(week[-1]['tasks'] for week in month):
+            for week in month:
+                week.pop()
+            weekdays.pop()
+
+        while month and not any(day['tasks'] for day in month[0]):
+            month.pop(0)
+
+        while month and not any(day['tasks'] for day in month[-1]):
+            month.pop()
+
+    if month:
+        print(
+            _format_month_table(month, weekdays,
+                                dt.datetime(year=today.year,
+                                            month=today.month +
+                                            int(args.next),
+                                            day=1).strftime('%B')))
+    else:
+        print('No tasks found')
 
 
 def _format_month_table(month: list[dict[str, Any]], weekdays: list[dict],
@@ -347,7 +369,7 @@ def _format_month_table(month: list[dict[str, Any]], weekdays: list[dict],
         for day in week:
             day['tasks'].extend([''] * (block_height - len(day['tasks'])))
 
-    for i in range(7):
+    for i in range(len(month[0])):
         weekdays[i]['width'] = max(
             max([len(task) for task in week[i]['tasks']] +
                 [len(week[i]['day'])] + [len(weekdays[i]['day'])])
@@ -355,13 +377,14 @@ def _format_month_table(month: list[dict[str, Any]], weekdays: list[dict],
         weekdays[i]['day'] += ' ' * \
             (weekdays[i]['width'] - len(weekdays[i]['day']))
         for week in month:
-            week[i]['day'] += ' ' * \
-                (weekdays[i]['width'] - len(week[i]['day']))
+            week[i]['day'] = ' ' * \
+                (weekdays[i]['width'] - len(week[i]['day'])) + week[i]['day']
             for j in range(len(week[i]['tasks'])):
                 week[i]['tasks'][j] += ' ' * \
                     (weekdays[i]['width'] - len(week[i]['tasks'][j]))
 
-    total_width = sum([weekday['width'] for weekday in weekdays]) + 8
+    total_width = sum([weekday['width'] for weekday in weekdays]) + \
+        len(weekdays) + 1
     table_so_far = '┌' + '─' * (total_width - 2) + '┐'
     table_so_far += '\n│' + month_name + ' ' * \
         (total_width - 2 - len(month_name)) + '│'
