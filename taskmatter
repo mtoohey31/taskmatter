@@ -133,7 +133,7 @@ def _get_paths(paths: list[str], input_paths: list[str],
     in the scope of the user's command."""
     # NOTE: this function could be simplified by only using a single for loop
     # and calling itself recursively faster, but then the recursive argument
-    # couldn't be used correctly while also beling able to specify both
+    # couldn't be used correctly while also being able to specify both
     # directories and files in the arguments
 
     # Check each provided path
@@ -191,12 +191,37 @@ def _format_task(task: dict[str, Any]) -> str:
     return task_str_so_far
 
 
+def _get_day_sorted_tasks(frontmatter: list[dict], day_start: dt.datetime,
+                          args: ap.Namespace) -> list[str]:
+    day_end = day_start + dt.timedelta(days=1)
+    # TODO: Handle intervals better with DateDataParser to get period
+    sorted_tasks = sorted([task for task in frontmatter if
+                           ('done' not in task or not task['done']
+                            or args.all) and
+                           (('planned' in task and
+                            day_start < dp.parse(task['planned']) < day_end) or
+                            ('planned' not in task and 'due' in task and
+                            day_start < dp.parse(task['due']) < day_end))],
+                          key=lambda x: x['planned'] if 'planned' in x else x['due']) + \
+        [task for task in frontmatter if
+         ('done' not in task or not task['done'] or args.all) and
+         (('planned' in task and dp.parse(task['planned']) == day_start) or
+          ('planned' not in task and 'due' in task
+           and dp.parse(task['due']) == day_start))]
+
+    formatted_tasks = []
+
+    for task in sorted_tasks:
+        formatted_tasks.append(_format_task(task))
+
+    return formatted_tasks
+
+
 def week(args: ap.Namespace) -> None:
     """The function corresponding to the `week` subcommand which prints the
     incomplete tasks for this week, or all tasks for this week if `-a` is
     specified."""
     # TODO: Handle repeated tasks
-    # TODO: Refactor into multiple helper functions
 
     frontmatter = _get_fm(args)
 
@@ -209,29 +234,8 @@ def week(args: ap.Namespace) -> None:
 
     for day_offset in range(7):
         day_start = week_start + dt.timedelta(days=day_offset)
-        day_end = week_start + dt.timedelta(days=day_offset + 1)
-        # TODO: Handle intervals better with DateDataParser to get period
-        sorted_tasks = sorted([task for task in frontmatter if
-                               ('done' not in task or not task['done']
-                                or args.all) and
-                               (('planned' in task and
-                                day_start < dp.parse(task['planned']) < day_end) or
-                                ('planned' not in task and 'due' in task and
-                                day_start < dp.parse(task['due']) < day_end))],
-                              key=lambda x: x['planned'] if 'planned' in x else x['due']) + \
-            [task for task in frontmatter if
-             ('done' not in task or not task['done'] or args.all) and
-             (('planned' in task and dp.parse(task['planned']) == day_start) or
-              ('planned' not in task and 'due' in task
-               and dp.parse(task['due']) == day_start))]
-
-        formatted_tasks = []
-
-        for task in sorted_tasks:
-            formatted_tasks.append(_format_task(task))
-
         week.append({'day': day_start.strftime(
-            '%A, %b %-d'), 'tasks': formatted_tasks})
+            '%A, %b %-d'), 'tasks': _get_day_sorted_tasks(frontmatter, day_start, args)})
 
     if not args.notrim:
         while week and not week[0]['tasks']:
@@ -276,7 +280,6 @@ def month(args: ap.Namespace) -> None:
     incomplete tasks for this month, or all tasks for this month if `-a` is
     specified."""
     # TODO: Handle repeated tasks
-    # TODO: Refactor into multiple helper functions
 
     frontmatter = _get_fm(args)
 
@@ -305,29 +308,8 @@ def month(args: ap.Namespace) -> None:
 
         for day_offset in range(7):
             day_start = week_start + dt.timedelta(days=day_offset)
-            day_end = week_start + dt.timedelta(days=day_offset + 1)
-            # TODO: Handle intervals better with DateDataParser to get period
-            sorted_tasks = sorted([task for task in frontmatter if
-                                   ('done' not in task or not task['done']
-                                    or args.all) and
-                                   (('planned' in task and
-                                    day_start < dp.parse(task['planned']) < day_end) or
-                                    ('planned' not in task and 'due' in task and
-                                    day_start < dp.parse(task['due']) < day_end))],
-                                  key=lambda x: x['planned'] if 'planned' in x else x['due']) + \
-                [task for task in frontmatter if
-                 ('done' not in task or not task['done'] or args.all) and
-                 (('planned' in task and dp.parse(task['planned']) == day_start) or
-                  ('planned' not in task and 'due' in task
-                   and dp.parse(task['due']) == day_start))]
-
-            formatted_tasks = []
-
-            for task in sorted_tasks:
-                formatted_tasks.append(_format_task(task))
-
             week.append({'day': day_start.strftime(
-                '%-d'), 'tasks': formatted_tasks})
+                '%-d'), 'tasks': _get_day_sorted_tasks(frontmatter, day_start, args)})
 
         month.append(week)
 
