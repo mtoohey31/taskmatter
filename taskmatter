@@ -428,6 +428,19 @@ def add(args: ap.Namespace) -> None:
             key = split_props[0].strip()
             value = ':'.join(split_props[1:]).strip()
 
+        # If the property is `done`, then try to parse it as a boolean.
+        if key == 'done':
+            if value in ['True', 'true', 'Yes', 'yes', '1']:
+                props[key] = True
+            elif value in ['False', 'false', 'No', 'no', '0']:
+                props[key] = False
+            else:
+                # If this fails, then raise an error
+                raise ValueError('The `done` property must be a boolean value')
+            # Otherwise, skip all further processing of this property and
+            # proceed to the next argument
+            continue
+
         # Attempt to parse the value as a date, including the time as a period
         parser = ddp(settings={'RETURN_TIME_AS_PERIOD': True})
         date = parser.get_date_data(value)
