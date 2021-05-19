@@ -378,7 +378,8 @@ def _format_month_table(month: list[dict[str, Any]], weekdays: list[dict],
         table_so_far += '\n├' + \
             '┼'.join(['─' * weekday['width'] for weekday in weekdays]) + '┤'
         table_so_far += '\n│' + \
-            '│'.join([task['day'] for task in week]) + '│'
+            '│'.join(['\x1b[1m' + task['day'] +
+                     '\x1b[0m' for task in week]) + '│'
         if len(week[0]['tasks']) != 0:
             for i in range(len(week[0]['tasks'])):
                 table_so_far += '\n│' + \
