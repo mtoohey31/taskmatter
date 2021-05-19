@@ -182,11 +182,19 @@ def _main() -> None:
 
 def _format_task(task: dict[str, Any]) -> str:
     task_str_so_far = '[' + task['__id__'] + '] ' + task['__title__']
-    task_time = dp.parse(
-        task['planned'] if 'planned' in task else task['due']).time()
-    if task_time != dt.time.min:
+    parser = ddp(settings={'RETURN_TIME_AS_PERIOD': True})
+    task_time = parser.get_date_data(
+        task['planned'] if 'planned' in task else task['due'])
+    if task_time.period == 'time' and task_time.date_obj.minute == 0 and \
+            task_time.date_obj.second == 0:
         task_str_so_far += ' - ' + \
-            task_time.strftime('%-I:%M:%S %p')
+            task_time.date_obj.strftime('%-I %p')
+    elif task_time.period == 'time' and task_time.date_obj.second == 0:
+        task_str_so_far += ' - ' + \
+            task_time.date_obj.strftime('%-I:%M %p')
+    elif task_time.period == 'time':
+        task_str_so_far += ' - ' + \
+            task_time.date_obj.strftime('%-I:%M:%S %p')
 
     return task_str_so_far
 
