@@ -335,12 +335,14 @@ def month(args: ap.Namespace) -> None:
                 for i in range(7)]
 
     if not args.notrim:
-        while month and not any(week[0]['tasks'] for week in month):
+        while month and weekdays and not any(week[0]['tasks']
+                                             for week in month):
             for week in month:
                 week.pop(0)
             weekdays.pop(0)
 
-        while month and not any(week[-1]['tasks'] for week in month):
+        while month and weekdays and not any(week[-1]['tasks']
+                                             for week in month):
             for week in month:
                 week.pop()
             weekdays.pop()
