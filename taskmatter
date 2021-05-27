@@ -9,7 +9,6 @@ import argparse as ap
 import datetime as dt
 import frontmatter as fm
 import yaml
-import dateparser as dp
 from dateparser.date import DateDataParser as ddp
 
 DEFAULT_CONFIG = {'default_path': ['./']}
@@ -181,6 +180,8 @@ def _main() -> None:
 
 
 def _format_task(task: dict[str, Any]) -> str:
+    # TODO: Change colour of task based on whether its time has passed or is
+    # today
     task_str_so_far = '[' + task['__id__'] + '] ' + task['__title__']
     parser = ddp(settings={'RETURN_TIME_AS_PERIOD': True})
     task_time = parser.get_date_data(
@@ -326,8 +327,9 @@ def month(args: ap.Namespace) -> None:
 
         for day_offset in range(7):
             day_start = week_start + dt.timedelta(days=day_offset)
-            week.append({'day': day_start.strftime(
-                '%-d'), 'tasks': _get_day_sorted_tasks(frontmatter, day_start, args)})
+            week.append({'day': day_start.strftime('%-d'),
+                         'tasks': _get_day_sorted_tasks(frontmatter,
+                                                        day_start, args)})
 
         month.append(week)
 
