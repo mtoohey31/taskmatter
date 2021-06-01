@@ -246,8 +246,8 @@ def week(args: ap.Namespace) -> None:
 
     today = dt.datetime.today().date()
     weekday = today.isoweekday()
-    week_start = dt.date(today.year, today.month,
-                         today.day - weekday + (7 * int(args.next)))
+    week_start = dt.date(today.year, today.month, today.day) - \
+        dt.timedelta(days=weekday + (7 * int(args.next)))
 
     week = []
 
