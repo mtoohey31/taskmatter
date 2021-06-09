@@ -265,8 +265,6 @@ def week(args: ap.Namespace) -> None:
 
     if week:
         print(_format_week_table(week))
-    else:
-        print('No tasks found')
 
 
 def _format_week_table(week: list[dict[str, Any]]) -> str:
@@ -365,8 +363,6 @@ def month(args: ap.Namespace) -> None:
                                             month=today.month +
                                             int(args.next),
                                             day=1).strftime('%B')))
-    else:
-        print('No tasks found')
 
 
 def _format_month_table(month: list[dict[str, Any]], weekdays: list[dict],
