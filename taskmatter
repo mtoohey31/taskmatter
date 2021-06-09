@@ -246,8 +246,8 @@ def week(args: ap.Namespace) -> None:
 
     today = dt.datetime.today().date()
     weekday = today.isoweekday()
-    week_start = dt.date(today.year, today.month, today.day) - \
-        dt.timedelta(days=weekday + (7 * int(args.next)))
+    week_start = dt.date(today.year, today.month, today.day) + \
+        dt.timedelta(days=(7 * int(args.next)) - weekday)
 
     week = []
 
@@ -303,10 +303,13 @@ def month(args: ap.Namespace) -> None:
     frontmatter = _get_fm(args)
 
     today = dt.datetime.today().date()
-    month_start_weekday = dt.date(today.year, today.month +
-                                  int(args.next), 1).isoweekday()
-    month_start = dt.date(
-        today.year, today.month + int(args.next), 1) - dt.timedelta(days=month_start_weekday)
+    raw_month = today.month + int(args.next)
+    adjusted_month = raw_month % 12
+    adjusted_year = today.year + int((raw_month - (raw_month % 12)) / 12)
+    month_start_weekday = dt.date(
+        adjusted_year, adjusted_month, 1).isoweekday()
+    month_start = dt.date(adjusted_year, adjusted_month, 1) - \
+        dt.timedelta(days=month_start_weekday)
     month_end_weekday = (dt.date(today.year, (today.month + int(args.next)) % 12 +
                                  1, 1) - dt.timedelta(days=1)).isoweekday()
     month_end = (dt.date(today.year, (today.month + int(args.next)) % 12 +
