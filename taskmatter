@@ -47,50 +47,68 @@ def _get_args() -> ap.Namespace:
     config = _get_config()
 
     parser = ap.ArgumentParser(prog="taskmatter",
-                               description='Process tasks in Markdown YAML '
+                               description='process tasks in Markdown YAML '
                                'frontmatter.')
     subparsers = parser.add_subparsers(title='subcommands')
     parser.set_defaults(func=week, next=0, all=None, recursive=None,
                         notrim=None, paths=config['default_path'])
 
-    week_parser = subparsers.add_parser('week', aliases=['w'])
+    week_parser = subparsers.add_parser('week', aliases=['w'],
+                                        help="show tasks due this week")
     week_parser.add_argument(
         "paths", nargs='*', default=config['default_path'])
-    week_parser.add_argument('-n', dest="next", default=0)
+    week_parser.add_argument('-n', dest="next", default=0, type=int,
+                             metavar="INT", help="offset INT weeks from today")
     week_parser.add_argument(
-        '-a', action=ap.BooleanOptionalAction, dest="all")
+        '-a', action=ap.BooleanOptionalAction, dest="all",
+        help="also show completed tasks")
     week_parser.add_argument(
-        '-r', action=ap.BooleanOptionalAction, dest="recursive")
+        '-r', action=ap.BooleanOptionalAction, dest="recursive",
+        help="search for tasks recursively")
     week_parser.add_argument(
-        '-T', action=ap.BooleanOptionalAction, dest="notrim")
+        '-T', action=ap.BooleanOptionalAction, dest="notrim",
+        help="don't cut off empty days")
     week_parser.set_defaults(func=week)
 
-    month_parser = subparsers.add_parser('month', aliases=['m'])
+    month_parser = subparsers.add_parser(
+        'month', aliases=['m'], help="show tasks due this month")
     month_parser.add_argument(
         "paths", nargs='*', default=config['default_path'])
-    month_parser.add_argument('-n', dest="next", default=0)
+    month_parser.add_argument('-n', dest="next", default=0, type=int,
+                              metavar="INT", help="offset INT weeks from today")
     month_parser.add_argument(
-        '-a', action=ap.BooleanOptionalAction, dest="all")
+        '-a', action=ap.BooleanOptionalAction, dest="all",
+        help="also show completed tasks")
     month_parser.add_argument(
-        '-r', action=ap.BooleanOptionalAction, dest="recursive")
+        '-r', action=ap.BooleanOptionalAction, dest="recursive",
+        help="search for tasks recursively")
     month_parser.add_argument(
-        '-T', action=ap.BooleanOptionalAction, dest="notrim")
+        '-T', action=ap.BooleanOptionalAction, dest="notrim",
+        help="don't cut off empty weeks")
     month_parser.set_defaults(func=month)
 
-    add_parser = subparsers.add_parser('add', aliases=['a'])
+    add_parser = subparsers.add_parser('add', aliases=['a'],
+                                       help="add a new task in the current "
+                                       "directory")
     add_parser.add_argument("title")
     add_parser.add_argument("props", nargs="*")
     add_parser.set_defaults(recursive=False)
     add_parser.set_defaults(func=add)
 
-    edit_parser = subparsers.add_parser('edit', aliases=['e'])
+    edit_parser = subparsers.add_parser('edit', aliases=['e'],
+                                        help="edit the specified task")
     edit_parser.add_argument("targets", nargs='+')
     edit_parser.add_argument(
-        '-r', action=ap.BooleanOptionalAction, dest="recursive")
+        '-r', action=ap.BooleanOptionalAction, dest="recursive",
+        help="search for tasks recursively")
     edit_parser.set_defaults(func=edit)
 
-    done_parser = subparsers.add_parser('done', aliases=['d'])
+    done_parser = subparsers.add_parser('done', aliases=['d'],
+                                        help="mark the specified task as done")
     done_parser.add_argument("targets", nargs='+')
+    done_parser.add_argument(
+        '-r', action=ap.BooleanOptionalAction, dest="recursive",
+        help="search for tasks recursively")
     done_parser.set_defaults(func=done)
 
     return parser.parse_args()
