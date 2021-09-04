@@ -114,7 +114,7 @@ def _get_fm(args: ap.Namespace) -> list[dict]:
     frontmatter_so_far = []
     for tm_file in tm_files:
         curr_frontmatter = fm.load(tm_file)
-        if curr_frontmatter is not None and '_tm' in curr_frontmatter:
+        if curr_frontmatter is not None and '_tm' in curr_frontmatter and curr_frontmatter['_tm'] is not None:
 
             frontmatter_so_far.append({**curr_frontmatter['_tm'],
                                        **{"__path__": tm_file},
