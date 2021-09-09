@@ -214,7 +214,7 @@ def _main() -> None:
 
 def _format_task(task: dict[str, Any], timeless=False) -> str:
     # TODO: Change colour of task based on whether its time has passed or is
-    # today
+    # today, as well as whether it's complete
     task_str_so_far = '[' + task['__id__'] + '] ' + task['__title__']
     if not timeless:
         parser = ddp(settings={'RETURN_TIME_AS_PERIOD': True})
@@ -398,23 +398,6 @@ def month(args: ap.Namespace) -> None:
                                             int(args.next),
                                             day=1).strftime('%B')))
 
-def someday(args: ap.Namespace) -> None:
-    """The function corresponding to the `someday` subcommand which prints the
-    incomplete tasks without planned or due dates, or all tasks without planned
-    or due dates if `-a` is specified."""
-    # TODO: Handle repeated tasks
-
-    frontmatter = _get_fm(args)
-
-    filtered_frontmatter = [task for task in frontmatter if '_tm' not in task
-                            or ('due' not in task and 'planned' not in task)]
-
-    for formatted_task in [_format_task(task, True) for task in \
-                           filtered_frontmatter]:
-        print(formatted_task)
-
-
-
 
 def _format_month_table(month: list[dict[str, Any]], weekdays: list[dict],
                         month_name: str) -> str:
@@ -460,6 +443,26 @@ def _format_month_table(month: list[dict[str, Any]], weekdays: list[dict],
         '┴'.join(['─' * weekday['width'] for weekday in weekdays]) + '┘'
 
     return table_so_far
+
+
+def someday(args: ap.Namespace) -> None:
+    """The function corresponding to the `someday` subcommand which prints the
+    incomplete tasks without planned or due dates, or all tasks without planned
+    or due dates if `-a` is specified."""
+    # TODO: Handle repeated tasks
+
+    frontmatter = _get_fm(args)
+
+    filtered_frontmatter = [task for task in frontmatter if ('done' not in task
+                                                             or not
+                                                             task['done'] or
+                                                             args.all) and
+                            ('_tm' not in task or ('due' not in task and
+                                                   'planned' not in task))]
+
+    for formatted_task in [_format_task(task, True) for task in \
+                           filtered_frontmatter]:
+        print(formatted_task)
 
 
 def add(args: ap.Namespace) -> None:
