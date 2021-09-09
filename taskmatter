@@ -125,6 +125,8 @@ def _get_args() -> ap.Namespace:
         help="search for tasks recursively")
     done_parser.set_defaults(func=done)
 
+    # TODO: add rename subcommand that gets the title
+
     return parser.parse_args()
 
 
@@ -609,13 +611,11 @@ def done(args: ap.Namespace) -> None:
                     file_fm = fm.load(item['__path__'])
                     if '_tm' in file_fm and isinstance(file_fm['_tm'], dict):
                         file_fm['_tm']['done'] = True
-                    if '_tm' in file_fm and file_fm['_tm'] is None:
-                        file_fm['_tm'] = {'done': True}
-                    elif '_tm' in file_fm:
+                    elif '_tm' in file_fm and file_fm['_tm'] is not None:
                         raise ValueError(
                             f'{target} contains unsupported `_tm` key')
                     else:
-                        file_fm['_tm'] = {'done': True}
+                         file_fm['_tm'] = {'done': True}
                     fm.dump(file_fm, f)
 
                     with open(item['__path__'], 'w') as file:
