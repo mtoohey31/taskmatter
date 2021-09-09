@@ -604,10 +604,10 @@ def done(args: ap.Namespace) -> None:
                     # if this was not possible, then write the file
                     f = BytesIO()
                     file_fm = fm.load(item['__path__'])
-                    if '_tm' in file_fm and \
-                            (isinstance(file_fm['_tm'], dict)
-                             or file_fm['_tm'] is None):
+                    if '_tm' in file_fm and isinstance(file_fm['_tm'], dict):
                         file_fm['_tm']['done'] = True
+                    if '_tm' in file_fm and file_fm['_tm'] is None:
+                        file_fm['_tm'] = {'done': True}
                     elif '_tm' in file_fm:
                         raise ValueError(
                             f'{target} contains unsupported `_tm` key')
