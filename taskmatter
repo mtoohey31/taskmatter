@@ -87,6 +87,20 @@ def _get_args() -> ap.Namespace:
         help="don't cut off empty weeks")
     month_parser.set_defaults(func=month)
 
+    someday_parser = subparsers.add_parser('someday', aliases=['s'],
+                                           help="show tasks without planned "
+                                           "or due dates")
+    someday_parser.add_argument(
+        "paths", nargs='*', default=config['default_path'])
+    someday_parser.add_argument(
+        '-a', action=ap.BooleanOptionalAction, dest="all",
+        help="also show completed tasks")
+    someday_parser.add_argument(
+        '-r', action=ap.BooleanOptionalAction, dest="recursive",
+        help="search for tasks recursively")
+    someday_parser.set_defaults(func=someday)
+
+
     add_parser = subparsers.add_parser('add', aliases=['a'],
                                        help="add a new task in the current "
                                        "directory")
@@ -193,27 +207,29 @@ def _main() -> None:
     # actual arguments instead of as a single object, so that taskmatter can
     # be imported, and the public functions called directly without having to
     # create an argparse.Namespace object
+    # TODO: Support colour coding by name of git repositories
     args = _get_args()
     args.func(args)
 
 
-def _format_task(task: dict[str, Any]) -> str:
+def _format_task(task: dict[str, Any], timeless=False) -> str:
     # TODO: Change colour of task based on whether its time has passed or is
     # today
     task_str_so_far = '[' + task['__id__'] + '] ' + task['__title__']
-    parser = ddp(settings={'RETURN_TIME_AS_PERIOD': True})
-    task_time = parser.get_date_data(
-        task['planned'] if 'planned' in task else task['due'])
-    if task_time.period == 'time' and task_time.date_obj.minute == 0 and \
-            task_time.date_obj.second == 0:
-        task_str_so_far += ' - ' + \
-            task_time.date_obj.strftime('%-I %p')
-    elif task_time.period == 'time' and task_time.date_obj.second == 0:
-        task_str_so_far += ' - ' + \
-            task_time.date_obj.strftime('%-I:%M %p')
-    elif task_time.period == 'time':
-        task_str_so_far += ' - ' + \
-            task_time.date_obj.strftime('%-I:%M:%S %p')
+    if not timeless:
+        parser = ddp(settings={'RETURN_TIME_AS_PERIOD': True})
+        task_time = parser.get_date_data(
+            task['planned'] if 'planned' in task else task['due'])
+        if task_time.period == 'time' and task_time.date_obj.minute == 0 and \
+                task_time.date_obj.second == 0:
+            task_str_so_far += ' - ' + \
+                task_time.date_obj.strftime('%-I %p')
+        elif task_time.period == 'time' and task_time.date_obj.second == 0:
+            task_str_so_far += ' - ' + \
+                task_time.date_obj.strftime('%-I:%M %p')
+        elif task_time.period == 'time':
+            task_str_so_far += ' - ' + \
+                task_time.date_obj.strftime('%-I:%M:%S %p')
 
     return task_str_so_far
 
@@ -381,6 +397,23 @@ def month(args: ap.Namespace) -> None:
                                             month=today.month +
                                             int(args.next),
                                             day=1).strftime('%B')))
+
+def someday(args: ap.Namespace) -> None:
+    """The function corresponding to the `someday` subcommand which prints the
+    incomplete tasks without planned or due dates, or all tasks without planned
+    or due dates if `-a` is specified."""
+    # TODO: Handle repeated tasks
+
+    frontmatter = _get_fm(args)
+
+    filtered_frontmatter = [task for task in frontmatter if '_tm' not in task
+                            or ('due' not in task and 'planned' not in task)]
+
+    for formatted_task in [_format_task(task, True) for task in \
+                           filtered_frontmatter]:
+        print(formatted_task)
+
+
 
 
 def _format_month_table(month: list[dict[str, Any]], weekdays: list[dict],
