@@ -491,7 +491,8 @@ def add(args: ap.Namespace) -> None:
     # possibility of id conflicts when adding task lists from other computers
     # for example, so they have to be resolved by the list methods.
     id = ''.join([chr(rd.randint(97, 122)) for _ in range(3)])
-    while id in [info[file]['__id__'] for file in info]:
+    while id in [info[file]['__id__'] for file in info
+                 if info[file] is not None]:
         id = ''.join([chr(rd.randint(97, 122)) for _ in range(3)])
 
     props = {}
