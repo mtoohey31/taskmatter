@@ -275,7 +275,7 @@ def _get_day_sorted_tasks(frontmatter: list[dict], day_start: dt.date,
                         day_tasks.append(task)
 
     return [_format_task(task[0]) for task
-            in sorted(time_tasks, key=lambda x: x[1])] + \
+            in sorted(time_tasks, key=lambda x: x[1].date_obj)] + \
         [_format_task(task) for task in day_tasks]
 
 
