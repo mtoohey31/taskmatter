@@ -466,8 +466,7 @@ def someday(args: ap.Namespace) -> None:
                                                              or not
                                                              task['done'] or
                                                              args.all) and
-                            ('_tm' not in task or ('due' not in task and
-                                                   'planned' not in task))]
+                            ('due' not in task and 'planned' not in task)]
 
     for formatted_task in [_format_task(task, True) for task in \
                            filtered_frontmatter]:
