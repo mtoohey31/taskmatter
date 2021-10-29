@@ -6,6 +6,7 @@ from typing import Union, Any
 from io import BytesIO
 import random as rd
 import argparse as ap
+import argcomplete as ac
 import datetime as dt
 import frontmatter as fm
 import yaml
@@ -127,6 +128,8 @@ def _get_args() -> ap.Namespace:
 
     # TODO: add rename subcommand that gets the title
     # TODO: add delete subcommand
+
+    ac.autocomplete(parser)
 
     return parser.parse_args()
 
