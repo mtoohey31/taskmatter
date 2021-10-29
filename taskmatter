@@ -507,9 +507,9 @@ def add(args: ap.Namespace) -> None:
 
         # If the property is `done`, then try to parse it as a boolean.
         if key == 'done':
-            if value in ['True', 'true', 'Yes', 'yes', '1']:
+            if value in ['True', 'true', 'Yes', 'yes', 'Y', 'y', 1]:
                 props[key] = True
-            elif value in ['False', 'false', 'No', 'no', '0']:
+            elif value in ['False', 'false', 'No', 'no', 'N', 'n', 0]:
                 props[key] = False
             else:
                 # If this fails, then raise an error
@@ -517,6 +517,27 @@ def add(args: ap.Namespace) -> None:
             # Otherwise, skip all further processing of this property and
             # proceed to the next argument
             continue
+
+        # Next, try to parse any argument as a boolean, but less aggressively,
+        # and allow failure
+        if value in ['True', 'true', 'Yes', 'yes', 'Y', 'y']:
+            props[key] = True
+            continue
+        elif value in ['False', 'false', 'No', 'no', 'N', 'n']:
+            props[key] = False
+            continue
+
+        # Next, try to parse the value as a number, first int then float
+        try:
+            props[key] = int(value)
+            continue
+        except ValueError:
+            pass
+            try:
+                props[key] = float(value)
+                continue
+            except ValueError:
+                pass
 
         # Attempt to parse the value as a date, including the time as a period
         parser = ddp(settings={'RETURN_TIME_AS_PERIOD': True})
