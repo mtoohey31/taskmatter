@@ -101,7 +101,6 @@ def _get_args() -> ap.Namespace:
         help="search for tasks recursively")
     someday_parser.set_defaults(func=someday)
 
-
     add_parser = subparsers.add_parser('add', aliases=['a'],
                                        help="add a new task in the current "
                                        "directory")
@@ -471,7 +470,7 @@ def someday(args: ap.Namespace) -> None:
                                                              args.all) and
                             ('due' not in task and 'planned' not in task)]
 
-    for formatted_task in [_format_task(task, True) for task in \
+    for formatted_task in [_format_task(task, True) for task in
                            filtered_frontmatter]:
         print(formatted_task)
 
@@ -646,7 +645,7 @@ def done(args: ap.Namespace) -> None:
                         raise ValueError(
                             f'{target} contains unsupported `_tm` key')
                     else:
-                         file_fm['_tm'] = {'done': True}
+                        file_fm['_tm'] = {'done': True}
                     fm.dump(file_fm, f)
 
                     with open(item['__path__'], 'w') as file:
