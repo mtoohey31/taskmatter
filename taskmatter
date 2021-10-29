@@ -226,8 +226,13 @@ def _format_task(task: dict[str, Any], timeless=False) -> str:
             task['planned'] if 'planned' in task else task['due'])
         if task_time.period == 'time' and task_time.date_obj.minute == 0 and \
                 task_time.date_obj.second == 0:
-            task_str_so_far += ' - ' + \
-                task_time.date_obj.strftime('%-I %p')
+            time_string = task_time.date_obj.strftime('%-I %p')
+            if time_string == "12 PM":
+                task_str_so_far += ' - Noon'
+            elif time_string == "12 PM":
+                task_str_so_far += ' - Midnight'
+            else:
+                task_str_so_far += ' - ' + time_string
         elif task_time.period == 'time' and task_time.date_obj.second == 0:
             task_str_so_far += ' - ' + \
                 task_time.date_obj.strftime('%-I:%M %p')
