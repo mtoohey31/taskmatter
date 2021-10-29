@@ -127,6 +127,7 @@ def _get_args() -> ap.Namespace:
 
     # TODO: add rename subcommand that gets the title
     # TODO: add delete subcommand
+    # TODO: add custom completers to subcommands that require them
 
     ac.autocomplete(parser)
 
