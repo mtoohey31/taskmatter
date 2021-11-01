@@ -246,40 +246,34 @@ def _format_task(task: dict[str, Any], timeless=False) -> str:
     return task_str_so_far
 
 
-def _get_day_sorted_tasks(frontmatter: list[dict], day_start: dt.date,
-                          args: ap.Namespace) -> list[str]:
-    time_tasks = []
-    day_tasks = []
+def _get_fm_map(frontmatter: list[dict]) -> dict[dt.date, list[dict]]:
+    """Transform the provided frontmatter from a list of tasks to a mapping of
+    dates to lists of tasks."""
+    frontmatter_map = {}
+
+    # add date objects to tasks
     parser = ddp(settings={'RETURN_TIME_AS_PERIOD': True})
-
     for task in frontmatter:
-        if 'done' not in task or not task['done'] or args.all:
-            if 'planned' in task:
-                task_date = parser.get_date_data(task['planned'])
-                if task_date.date_obj is None:
-                    raise ValueError('Task `[' + task['__id__'] + '] ' +
-                                     task['__title__'] + '` contains ' +
-                                     'unsupported `planned` date format')
-                elif task_date.date_obj.date() == day_start:
-                    if task_date.period == 'time':
-                        time_tasks.append((task, task_date))
-                    else:
-                        day_tasks.append(task)
-            elif 'due' in task:
-                task_date = parser.get_date_data(task['due'])
-                if task_date.date_obj is None:
-                    raise ValueError('Task `[' + task['__id__'] + '] ' +
-                                     task['__title__'] + '` contains ' +
-                                     'unsupported `due` date format')
-                elif task_date.date_obj.date() == day_start:
-                    if task_date.period == 'time':
-                        time_tasks.append((task, task_date))
-                    else:
-                        day_tasks.append(task)
+        if 'planned' in task:
+            if res := parser.get_date_data(task['planned']):
+                task['__date__'] = res
+            else:
+                continue
+        elif 'due' in task:
+            if res := parser.get_date_data(task['due']):
+                task['__date__'] = res
+            else:
+                continue
+        else:
+            continue
 
-    return [_format_task(task[0]) for task
-            in sorted(time_tasks, key=lambda x: x[1].date_obj)] + \
-        [_format_task(task) for task in day_tasks]
+        day = task['__date__'].date_obj.date()
+        if day not in frontmatter_map:
+            frontmatter_map[day] = [task]
+        else:
+            frontmatter_map[day].append(task)
+
+    return frontmatter_map
 
 
 def week(args: ap.Namespace) -> None:
@@ -295,12 +289,19 @@ def week(args: ap.Namespace) -> None:
     week_start = dt.date(today.year, today.month, today.day) + \
         dt.timedelta(days=(7 * int(args.next)) - weekday)
 
+    frontmatter_map = _get_fm_map(frontmatter)
     week = []
 
     for day_offset in range(7):
         day_start = week_start + dt.timedelta(days=day_offset)
-        week.append({'day': day_start.strftime(
-            '%A, %b %-d'), 'tasks': _get_day_sorted_tasks(frontmatter, day_start, args)})
+        if day_start in frontmatter_map:
+            week.append({'day': day_start.strftime(
+                '%A, %b %-d'), 'tasks': [_format_task(task) for task in
+                                         frontmatter_map[day_start] if 'done' not in task or not
+                                         task['done'] or args.notrim]})
+        else:
+            week.append({'day': day_start.strftime('%A, %b %-d'),
+                         'tasks': []})
 
     if not args.notrim:
         while week and not week[0]['tasks']:
@@ -366,31 +367,8 @@ def month(args: ap.Namespace) -> None:
         sundays.append(curr_sunday)
         curr_sunday += dt.timedelta(days=7)
 
+    frontmatter_map = _get_fm_map(frontmatter)
     month = []
-
-    frontmatter_map = {}
-
-    # add date objects to tasks
-    parser = ddp(settings={'RETURN_TIME_AS_PERIOD': True})
-    for task in frontmatter:
-        if 'planned' in task:
-            if res := parser.get_date_data(task['planned']):
-                task['__date__'] = res
-            else:
-                continue
-        elif 'due' in task:
-            if res := parser.get_date_data(task['due']):
-                task['__date__'] = res
-            else:
-                continue
-        else:
-            continue
-
-        day = task['__date__'].date_obj.date()
-        if day not in frontmatter_map:
-            frontmatter_map[day] = [task]
-        else:
-            frontmatter_map[day].append(task)
 
     for week_start in sundays:
 
@@ -398,10 +376,11 @@ def month(args: ap.Namespace) -> None:
 
         for day_offset in range(7):
             day_start = week_start + dt.timedelta(days=day_offset)
-            day = dt.datetime.combine(day_start, dt.datetime.min.time())
             if day_start in frontmatter_map:
                 week.append({'day': day_start.strftime('%-d'),
-                             'tasks': [_format_task(task) for task in frontmatter_map[day_start] if 'done' not in task or not task['done'] or args.notrim]})
+                             'tasks': [_format_task(task) for task in
+                                       frontmatter_map[day_start] if 'done' not in task or not
+                                       task['done'] or args.notrim]})
             else:
                 week.append({'day': day_start.strftime('%-d'),
                              'tasks': []})
