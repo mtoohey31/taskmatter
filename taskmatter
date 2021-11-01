@@ -51,7 +51,7 @@ def _get_args() -> ap.Namespace:
                                description='process tasks in Markdown YAML '
                                'frontmatter.')
     subparsers = parser.add_subparsers(title='subcommands')
-    parser.set_defaults(func=week, next=0, all=None, recursive=None,
+    parser.set_defaults(func=month, next=0, all=None, non_recursive=None,
                         notrim=None, paths=config['default_path'])
 
     week_parser = subparsers.add_parser('week', aliases=['w'],
@@ -64,8 +64,8 @@ def _get_args() -> ap.Namespace:
         '-a', action=ap.BooleanOptionalAction, dest="all",
         help="also show completed tasks")
     week_parser.add_argument(
-        '-r', action=ap.BooleanOptionalAction, dest="recursive",
-        help="search for tasks recursively")
+        '-R', action=ap.BooleanOptionalAction, dest="non_recursive",
+        help="don't search for tasks recursively")
     week_parser.add_argument(
         '-T', action=ap.BooleanOptionalAction, dest="notrim",
         help="don't cut off empty days")
@@ -81,8 +81,8 @@ def _get_args() -> ap.Namespace:
         '-a', action=ap.BooleanOptionalAction, dest="all",
         help="also show completed tasks")
     month_parser.add_argument(
-        '-r', action=ap.BooleanOptionalAction, dest="recursive",
-        help="search for tasks recursively")
+        '-R', action=ap.BooleanOptionalAction, dest="non_recursive",
+        help="don't search for tasks recursively")
     month_parser.add_argument(
         '-T', action=ap.BooleanOptionalAction, dest="notrim",
         help="don't cut off empty weeks")
@@ -97,8 +97,8 @@ def _get_args() -> ap.Namespace:
         '-a', action=ap.BooleanOptionalAction, dest="all",
         help="also show completed tasks")
     someday_parser.add_argument(
-        '-r', action=ap.BooleanOptionalAction, dest="recursive",
-        help="search for tasks recursively")
+        '-R', action=ap.BooleanOptionalAction, dest="non_recursive",
+        help="don't search for tasks recursively")
     someday_parser.set_defaults(func=someday)
 
     add_parser = subparsers.add_parser('add', aliases=['a'],
@@ -106,15 +106,15 @@ def _get_args() -> ap.Namespace:
                                        "directory")
     add_parser.add_argument("title")
     add_parser.add_argument("props", nargs="*")
-    add_parser.set_defaults(recursive=False)
+    add_parser.set_defaults(non_recursive=None)
     add_parser.set_defaults(func=add)
 
     edit_parser = subparsers.add_parser('edit', aliases=['e'],
                                         help="edit the specified task")
     edit_parser.add_argument("targets", nargs='+')
     edit_parser.add_argument(
-        '-r', action=ap.BooleanOptionalAction, dest="recursive",
-        help="search for tasks recursively")
+        '-R', action=ap.BooleanOptionalAction, dest="non_recursive",
+        help="don't search for tasks recursively")
     edit_parser.set_defaults(func=edit)
 
     done_parser = subparsers.add_parser('done', aliases=['d'],
@@ -184,11 +184,11 @@ def _get_paths(paths: list[str], input_paths: list[str],
             # directory
             for sub_path in os.listdir(path):
                 # If the path is a file, add it to the paths
-                if os.path.isfile(sub_path):
+                if args.non_recursive and os.path.isfile(sub_path):
                     paths.append(sub_path)
                 # Otherwise, if the recursive argument was passed, call this
                 # method recursively
-                elif args.recursive:
+                else:
                     _get_paths(paths, [os.path.join(path, sub_path)], args)
 
 
