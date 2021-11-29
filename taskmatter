@@ -8,6 +8,7 @@ import random as rd
 import argparse as ap
 import argcomplete as ac
 import datetime as dt
+import monthdelta as md
 import frontmatter as fm
 import yaml
 from dateparser.date import DateDataParser as ddp
@@ -348,17 +349,15 @@ def month(args: ap.Namespace) -> None:
     frontmatter = _get_fm(args)
 
     today = dt.datetime.today().date()
-    raw_month = today.month + int(args.next)
-    adjusted_month = raw_month % 12
-    adjusted_year = today.year + int((raw_month - (raw_month % 12)) / 12)
+    target = today + md.monthdelta(args.next)
     month_start_weekday = dt.date(
-        adjusted_year, adjusted_month, 1).isoweekday()
-    month_start = dt.date(adjusted_year, adjusted_month, 1) - \
+        target.year, target.month, 1).isoweekday()
+    month_start = dt.date(target.year, target.month, 1) - \
         dt.timedelta(days=month_start_weekday)
-    month_end_weekday = (dt.date(today.year, (today.month + int(args.next)) % 12 +
-                                 1, 1) - dt.timedelta(days=1)).isoweekday()
-    month_end = (dt.date(today.year, (today.month + int(args.next)) % 12 +
-                         1, 1) + dt.timedelta(days=6 - month_end_weekday))
+    month_end_weekday = (dt.date(target.year, target.month, 1) +
+                         md.monthdelta(1) - dt.timedelta(days=1)).isoweekday()
+    month_end = (dt.date(target.year, target.month, 1) +
+                 md.monthdelta(1) + dt.timedelta(days=6 - month_end_weekday))
 
     curr_sunday = month_start
     sundays = [curr_sunday]

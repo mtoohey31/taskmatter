@@ -2,3 +2,4 @@ argparse==1.4.0
 dateparser==1.0.0
 python-frontmatter==1.0.0
 argcomplete
+monthdelta==0.9
