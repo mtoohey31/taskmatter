@@ -13,6 +13,8 @@ import frontmatter as fm
 import yaml
 from dateparser.date import DateDataParser as ddp
 
+# TODO: compile to cython
+
 DEFAULT_CONFIG = {'default_path': ['./']}
 
 
@@ -256,12 +258,14 @@ def _get_fm_map(frontmatter: list[dict]) -> dict[dt.date, list[dict]]:
     parser = ddp(settings={'RETURN_TIME_AS_PERIOD': True})
     for task in frontmatter:
         if 'planned' in task:
-            if res := parser.get_date_data(task['planned']):
+            res = parser.get_date_data(task['planned'])
+            if res:
                 task['__date__'] = res
             else:
                 continue
         elif 'due' in task:
-            if res := parser.get_date_data(task['due']):
+            res = parser.get_date_data(task['due'])
+            if res:
                 task['__date__'] = res
             else:
                 continue
