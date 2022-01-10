@@ -12,6 +12,12 @@ import monthdelta as md
 import frontmatter as fm
 import yaml
 from dateparser.date import DateDataParser as ddp
+from warnings import filterwarnings
+
+filterwarnings(
+    "ignore",
+    message="The localize method is no longer necessary, as this time zone supports the fold attribute",
+)
 
 # TODO: compile to cython
 
