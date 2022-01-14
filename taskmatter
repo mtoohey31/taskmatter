@@ -309,7 +309,7 @@ def week(args: ap.Namespace) -> None:
             week.append({'day': day_start.strftime(
                 '%A, %b %-d'), 'tasks': [_format_task(task) for task in
                                          frontmatter_map[day_start] if 'done' not in task or not
-                                         task['done'] or args.notrim]})
+                                         task['done'] or args.all]})
         else:
             week.append({'day': day_start.strftime('%A, %b %-d'),
                          'tasks': []})
@@ -389,7 +389,7 @@ def month(args: ap.Namespace) -> None:
                 week.append({'day': day_start.strftime('%-d'),
                              'tasks': [_format_task(task) for task in
                                        frontmatter_map[day_start] if 'done' not in task or not
-                                       task['done'] or args.notrim]})
+                                       task['done'] or args.all]})
             else:
                 week.append({'day': day_start.strftime('%-d'),
                              'tasks': []})
@@ -420,11 +420,7 @@ def month(args: ap.Namespace) -> None:
 
     if month:
         print(
-            _format_month_table(month, weekdays,
-                                dt.datetime(year=today.year,
-                                            month=today.month +
-                                            int(args.next),
-                                            day=1).strftime('%B')))
+            _format_month_table(month, weekdays, month_start.strftime('%B')))
 
 
 def _format_month_table(month: list[dict[str, Any]], weekdays: list[dict],
