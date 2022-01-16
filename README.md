@@ -1,4 +1,4 @@
-# TaskMatter
+# taskmatter
 
 A task management tool that stores tasks as markdown files with properties in their front-matter.
 
