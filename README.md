@@ -2,6 +2,8 @@
 
 A task management tool that stores tasks as markdown files with properties in their front-matter.
 
+![screenshot](https://user-images.githubusercontent.com/36740602/149677423-c6cb4b8d-8098-4bfe-9ab1-ddb157708a0d.png)
+
 ## Installation
 
 ```sh
