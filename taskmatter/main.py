@@ -52,13 +52,28 @@ def _get_config() -> dict:
     return DEFAULT_CONFIG
 
 
+class TaskIDCompleter:
+    def __init__(self, incomplete_only: bool):
+        self.incomplete_only = incomplete_only
+
+    def __call__(self, **_):
+        # TODO: speed this up by filtering filenames before getting info using
+        # prefix and ids
+        frontmatter = _get_fm(["."], False)
+        if self.incomplete_only:
+            return [task['__id__'] for task in frontmatter if
+                    'done' not in task or not task['done']]
+        else:
+            return [task['__id__'] for task in frontmatter]
+
+
 def _get_args() -> ap.Namespace:
     """Get the arguments provided by the user at the command line."""
     config = _get_config()
 
-    parser = ap.ArgumentParser(prog="taskmatter",
-                               description='process tasks in Markdown YAML '
-                               'frontmatter.')
+    parser = ap.ArgumentParser(
+        prog="taskmatter",
+        description='process tasks in Markdown YAML frontmatter.')
     subparsers = parser.add_subparsers(title='subcommands')
     parser.set_defaults(func=month, next=0, all=None, non_recursive=None,
                         notrim=None, paths=config['default_path'])
@@ -66,9 +81,12 @@ def _get_args() -> ap.Namespace:
     week_parser = subparsers.add_parser('week', aliases=['w'],
                                         help="show tasks due this week")
     week_parser.add_argument(
-        "paths", nargs='*', default=config['default_path'])
-    week_parser.add_argument('-n', dest="next", default=0, type=int,
-                             metavar="INT", help="offset INT weeks from today")
+        "paths", nargs='*', default=config['default_path']
+    ).completer = ac.completers.DirectoriesCompleter()  # type: ignore
+    week_parser.add_argument(
+        '-n', dest="next", default=0, type=int,
+        metavar="INT", help="offset INT weeks from today"
+    ).completer = ac.completers.ChoicesCompleter(range(1, 10))  # type: ignore
     week_parser.add_argument(
         '-a', action=ap.BooleanOptionalAction, dest="all",
         help="also show completed tasks")
@@ -83,10 +101,13 @@ def _get_args() -> ap.Namespace:
     month_parser = subparsers.add_parser(
         'month', aliases=['m'], help="show tasks due this month")
     month_parser.add_argument(
-        "paths", nargs='*', default=config['default_path'])
-    month_parser.add_argument('-n', dest="next", default=0, type=int,
-                              metavar="INT",
-                              help="offset INT months from today")
+        "paths", nargs='*', default=config['default_path']
+    ).completer = ac.completers.DirectoriesCompleter()  # type: ignore
+    month_parser.add_argument(
+        '-n', dest="next", default=0, type=int,
+        metavar="INT",
+        help="offset INT months from today"
+    ).completer = ac.completers.ChoicesCompleter(range(1, 10))  # type: ignore
     month_parser.add_argument(
         '-a', action=ap.BooleanOptionalAction, dest="all",
         help="also show completed tasks")
@@ -98,11 +119,12 @@ def _get_args() -> ap.Namespace:
         help="don't cut off empty weeks")
     month_parser.set_defaults(func=month)
 
-    someday_parser = subparsers.add_parser('someday', aliases=['s'],
-                                           help="show tasks without planned "
-                                           "or due dates")
+    someday_parser = subparsers.add_parser(
+        'someday', aliases=['s'],
+        help="show tasks without planned or due dates")
     someday_parser.add_argument(
-        "paths", nargs='*', default=config['default_path'])
+        "paths", nargs='*', default=config['default_path']
+    ).completer = ac.completers.DirectoriesCompleter()  # type: ignore
     someday_parser.add_argument(
         '-a', action=ap.BooleanOptionalAction, dest="all",
         help="also show completed tasks")
@@ -111,17 +133,22 @@ def _get_args() -> ap.Namespace:
         help="don't search for tasks recursively")
     someday_parser.set_defaults(func=someday)
 
-    add_parser = subparsers.add_parser('add', aliases=['a'],
-                                       help="add a new task in the current "
-                                       "directory")
-    add_parser.add_argument("title")
-    add_parser.add_argument("props", nargs="*")
+    add_parser = subparsers.add_parser(
+        'add', aliases=['a'], help="add a new task in the current directory"
+    )
+    add_parser.add_argument(
+        "title").completer = ac.completers.SuppressCompleter  # type: ignore
+    add_parser.add_argument(
+        "props", nargs="*"
+    ).completer = ac.completers.SuppressCompleter  # type: ignore
     add_parser.set_defaults(non_recursive=None)
     add_parser.set_defaults(func=add)
 
     edit_parser = subparsers.add_parser('edit', aliases=['e'],
                                         help="edit the specified task")
-    edit_parser.add_argument("targets", nargs='+')
+    edit_parser.add_argument(
+        "targets", nargs='+'
+    ).completer = TaskIDCompleter(False)  # type: ignore
     edit_parser.add_argument(
         '-R', action=ap.BooleanOptionalAction, dest="non_recursive",
         help="don't search for tasks recursively")
@@ -129,7 +156,8 @@ def _get_args() -> ap.Namespace:
 
     done_parser = subparsers.add_parser('done', aliases=['d'],
                                         help="mark the specified task as done")
-    done_parser.add_argument("targets", nargs='+')
+    done_parser.add_argument(
+        "targets", nargs='+').completer = TaskIDCompleter(True)  # type: ignore
     done_parser.add_argument(
         '-r', action=ap.BooleanOptionalAction, dest="recursive",
         help="search for tasks recursively")
@@ -137,18 +165,17 @@ def _get_args() -> ap.Namespace:
 
     # TODO: add rename subcommand that gets the title
     # TODO: add delete subcommand
-    # TODO: add custom completers to subcommands that require them
 
     ac.autocomplete(parser)
 
     return parser.parse_args()
 
 
-def _get_fm(args: ap.Namespace) -> list[dict]:
+def _get_fm(target_paths: list[str], non_recursive: bool) -> list[dict[str, Any]]:
     """Using the _get_paths helper function, find the selected files and read
     their frontmatter, filtering out files that are not valid tasks."""
     paths = []
-    _get_paths(paths, args.paths, args)
+    _get_paths(paths, target_paths, non_recursive)
 
     info = {file: _get_info(file) for file in paths}
     # Filter the files by those whose info was found and who have the proper
@@ -176,7 +203,7 @@ def _get_fm(args: ap.Namespace) -> list[dict]:
 
 
 def _get_paths(paths: list[str], input_paths: list[str],
-               args: ap.Namespace) -> None:
+               non_recursive: bool) -> None:
     """Using the provided arguments, determine which paths are potential tasks
     in the scope of the user's command."""
     # NOTE: this function could be simplified by only using a single for loop
@@ -194,12 +221,13 @@ def _get_paths(paths: list[str], input_paths: list[str],
             # directory
             for sub_path in os.listdir(path):
                 # If the path is a file, add it to the paths
-                if args.non_recursive and os.path.isfile(sub_path):
+                if non_recursive and os.path.isfile(sub_path):
                     paths.append(sub_path)
                 # Otherwise, if the recursive argument was passed, call this
                 # method recursively
                 else:
-                    _get_paths(paths, [os.path.join(path, sub_path)], args)
+                    _get_paths(paths, [os.path.join(path, sub_path)],
+                               non_recursive)
 
 
 def _get_info(path: str) -> Union[dict[str, str], None]:
@@ -300,7 +328,7 @@ def week(args: ap.Namespace) -> None:
     specified."""
     # TODO: Handle repeated tasks
 
-    frontmatter = _get_fm(args)
+    frontmatter = _get_fm(args.paths, args.non_recursive)
 
     today = dt.datetime.today().date()
     weekday = today.isoweekday()
@@ -368,7 +396,7 @@ def month(args: ap.Namespace) -> None:
     specified."""
     # TODO: Handle repeated tasks
 
-    frontmatter = _get_fm(args)
+    frontmatter = _get_fm(args.paths, args.non_recursive)
 
     today = dt.datetime.today().date()
     target = today + md.monthdelta(args.next)
@@ -487,7 +515,7 @@ def someday(args: ap.Namespace) -> None:
     or due dates if `-a` is specified."""
     # TODO: Handle repeated tasks
 
-    frontmatter = _get_fm(args)
+    frontmatter = _get_fm(args.paths, args.non_recursive)
 
     filtered_frontmatter = [task for task in frontmatter if ('done' not in task
                                                              or not
@@ -505,7 +533,7 @@ def add(args: ap.Namespace) -> None:
     with the given title."""
     # Get all the paths within the current directory
     paths = []
-    _get_paths(paths, ['./'], args)
+    _get_paths(paths, ['./'], args.non_recursive)
 
     # Also get the info regarding each of the paths within the current directory
     info = {file: _get_info(file) for file in paths}
@@ -617,7 +645,7 @@ def edit(args: ap.Namespace) -> None:
     # TODO: Handle recursive/non-recursive possibilities better by starting
     # with a non-recursive check, informing the user if that did not succeed,
     # then proceeding to a recursive check
-    frontmatter = _get_fm(args)
+    frontmatter = _get_fm(args.paths, args.non_recursive)
 
     # Iterate through each target provided
     for target in args.targets:
@@ -649,7 +677,7 @@ def done(args: ap.Namespace) -> None:
     # TODO: Handle recursive/non-recursive possibilities better by starting
     # with a non-recursive check, informing the user if that did not succeed,
     # then proceeding to a recursive check
-    frontmatter = _get_fm(args)
+    frontmatter = _get_fm(args.paths, args.non_recursive)
 
     # Iterate through each target provided
     for target in args.targets:
