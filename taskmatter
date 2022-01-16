@@ -85,7 +85,8 @@ def _get_args() -> ap.Namespace:
     month_parser.add_argument(
         "paths", nargs='*', default=config['default_path'])
     month_parser.add_argument('-n', dest="next", default=0, type=int,
-                              metavar="INT", help="offset INT weeks from today")
+                              metavar="INT",
+                              help="offset INT months from today")
     month_parser.add_argument(
         '-a', action=ap.BooleanOptionalAction, dest="all",
         help="also show completed tasks")
