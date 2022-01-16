@@ -167,10 +167,10 @@ def _get_fm(args: ap.Namespace) -> list[dict]:
 
             frontmatter_so_far.append({**curr_frontmatter['_tm'],
                                        **{"__path__": tm_file},
-                                       **info[tm_file]})
+                                       **info[tm_file]})  # type: ignore
         else:
             frontmatter_so_far.append(
-                {**{"__path__": tm_file}, **info[tm_file]})
+                {**{"__path__": tm_file}, **info[tm_file]})  # type: ignore
 
     return frontmatter_so_far
 
@@ -237,6 +237,10 @@ def _format_task(task: dict[str, Any], timeless=False) -> str:
         parser = ddp(settings={'RETURN_TIME_AS_PERIOD': True})
         task_time = parser.get_date_data(
             task['planned'] if 'planned' in task else task['due'])
+
+        if task_time.date_obj is None:
+            return task_str_so_far
+
         if task_time.period == 'time' and task_time.date_obj.minute == 0 and \
                 task_time.date_obj.second == 0:
             time_string = task_time.date_obj.strftime('%-I %p')
@@ -266,20 +270,22 @@ def _get_fm_map(frontmatter: list[dict]) -> dict[dt.date, list[dict]]:
     for task in frontmatter:
         if 'planned' in task:
             res = parser.get_date_data(task['planned'])
-            if res:
+
+            if res.date_obj is not None:
                 task['__date__'] = res
             else:
                 continue
         elif 'due' in task:
             res = parser.get_date_data(task['due'])
-            if res:
+
+            if res.date_obj is not None:
                 task['__date__'] = res
             else:
                 continue
         else:
             continue
 
-        day = task['__date__'].date_obj.date()
+        day = task['__date__'].date_obj.date()  # type: ignore
         if day not in frontmatter_map:
             frontmatter_map[day] = [task]
         else:
@@ -429,7 +435,7 @@ def month(args: ap.Namespace) -> None:
             _format_month_table(month, weekdays, month_start.strftime('%B')))
 
 
-def _format_month_table(month: list[dict[str, Any]], weekdays: list[dict],
+def _format_month_table(month: list[list[dict[str, Any]]], weekdays: list[dict],
                         month_name: str) -> str:
     for week in month:
         block_height = max([len(day['tasks']) for day in week], default=0)
@@ -512,7 +518,7 @@ def add(args: ap.Namespace) -> None:
     # possibility of id conflicts when adding task lists from other computers
     # for example, so they have to be resolved by the list methods.
     id = ''.join([chr(rd.randint(97, 122)) for _ in range(3)])
-    while id in [info[file]['__id__'] for file in info
+    while id in [info[file]['__id__'] for file in info  # type: ignore
                  if info[file] is not None]:
         id = ''.join([chr(rd.randint(97, 122)) for _ in range(3)])
 
