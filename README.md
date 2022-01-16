@@ -1,6 +1,12 @@
 # TaskMatter
 
-A task management tool that stores tasks as markdown files with properties in their front-matter. This tool might not work for you, if that's the case but you're looking for something similar, check out dstask and its [alternatives list](https://github.com/naggie/dstask#alternatives).
+A task management tool that stores tasks as markdown files with properties in their front-matter.
+
+## Installation
+
+```sh
+pip3 install git+https://github.com/mtoohey31/taskmatter.git#egg=taskmatter
+```
 
 ## Task Properties
 
@@ -14,15 +20,16 @@ All task properties are stored under the `_tm` key in the markdown file's YAML f
 
 ## Commands
 
-| Command | Abbreviation | Result                                                  |
-| ------- | ------------ | ------------------------------------------------------- |
-| `week`  | `w`          | List all tasks planned or due this week.                |
-| `month` | `m`          | List all tasks planned or due this month.               |
-| `add`   | `a`          | Add a new task with the specified name and properties.  |
-| `edit`  | `e`          | Edit the task(s) with the specified id or path.         |
-| `done`  | `d`          | Mark the task(s) with the specified id or path as done. |
+| Command   | Abbreviation | Result                                                  |
+| --------- | ------------ | ------------------------------------------------------- |
+| `week`    | `w`          | List all tasks planned or due this week.                |
+| `month`   | `m`          | List all tasks planned or due this month.               |
+| `someday` | `s`          | List all tasks with no planned or due date.             |
+| `add`     | `a`          | Add a new task with the specified name and properties.  |
+| `edit`    | `e`          | Edit the task(s) with the specified id or path.         |
+| `done`    | `d`          | Mark the task(s) with the specified id or path as done. |
 
-Note that `week` is the default subcommand, so when `taskmatter` is run with no arguments, it will behave identically to `taskmatter week`.
+Note that `week` is the default subcommand, so when `taskmatter` is run with no arguments, it will behave identically to `taskmatter month`.
 
 ## Syncing
 
@@ -31,3 +38,7 @@ Tasks are structured as markdown files in specific directories on purpose so tha
 ## Suggestions
 
 - Typing `taskmatter` every time is a bit much, so aliasing it to something shorter such as `tm` or `t` in your shell's startup file will likely speed up your workflow.
+
+## Alternatives
+
+Check out dstask and its [alternatives list](https://github.com/naggie/dstask#alternatives).

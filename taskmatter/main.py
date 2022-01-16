@@ -218,7 +218,7 @@ def _get_info(path: str) -> Union[dict[str, str], None]:
         return None
 
 
-def _main() -> None:
+def main() -> None:
     """The main function of the program."""
     # TODO: Refactor so that the provided args are passed to the functions as
     # actual arguments instead of as a single object, so that taskmatter can
@@ -695,7 +695,3 @@ def done(args: ap.Namespace) -> None:
         # target was not found
         else:
             print(f'Could not parse task "{target}"')
-
-
-if __name__ == '__main__':
-    _main()

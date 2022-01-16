@@ -1,1 +1,3 @@
-completions
+/build
+/completions
+/taskmatter.egg-info
