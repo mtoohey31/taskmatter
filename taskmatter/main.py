@@ -162,16 +162,24 @@ def _get_args() -> ap.Namespace:
         "title").completer = ac.completers.SuppressCompleter  # type: ignore
     rename_parser.set_defaults(func=rename)
 
-    done_parser = subparsers.add_parser('done', aliases=['d'],
-                                        help="mark the specified task as done")
+    delete_parser = subparsers.add_parser(
+        'delete', aliases=['x'], help="delete the specified tasks")
+    delete_parser.add_argument(
+        "targets", nargs='+'
+    ).completer = TaskIDCompleter(False)  # type: ignore
+    delete_parser.add_argument(
+        '-R', action=ap.BooleanOptionalAction, dest="non_recursive",
+        help="don't search for tasks recursively")
+    delete_parser.set_defaults(func=delete)
+
+    done_parser = subparsers.add_parser(
+        'done', aliases=['d'], help="mark the specified tasks as done")
     done_parser.add_argument(
         "targets", nargs='+').completer = TaskIDCompleter(True)  # type: ignore
     done_parser.add_argument(
         '-R', action=ap.BooleanOptionalAction, dest="non_recursive",
         help="don't search for tasks recursively")
     done_parser.set_defaults(func=done)
-
-    # TODO: add delete subcommand
 
     ac.autocomplete(parser)
 
@@ -735,6 +743,33 @@ def rename(args: ap.Namespace) -> None:
     # target was not found
     else:
         print(f'Could not parse task "{args.target}"')
+
+
+def delete(args: ap.Namespace) -> None:
+    """The function corresponding to the `delete` command that deletes the
+    given targets."""
+    frontmatter = _get_fm(args.paths, args.non_recursive)
+
+    # Iterate through each target provided
+    for target in args.targets:
+        # First check if the target is an id, if so, use the gathered
+        # frontmatter to find the corresponding path
+        if re.match(r'^[a-z]{3}$', target):
+            for item in frontmatter:
+                if item['__id__'] == target:
+                    os.remove(item['__path__'])
+
+                    break
+            else:
+                print(f'No task with id: "{target}" found')
+        # If the target is not an id, but is a valid path, use the same logic
+        # as in the past case to merge properties and write the file
+        elif os.path.exists(target):
+            os.remove(target)
+        # Otherwise if none of the above worked, inform the user that the
+        # target was not found
+        else:
+            print(f'Could not parse task "{target}"')
 
 
 def done(args: ap.Namespace) -> None:
