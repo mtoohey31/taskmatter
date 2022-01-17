@@ -22,6 +22,7 @@ filterwarnings(
 # TODO: compile to cython
 
 DEFAULT_CONFIG = {'default_path': ['./']}
+VALID_EXTENSIONS = ['.md', '.pmd', '.rmd', '.Rmd']
 
 
 def _get_config() -> dict:
@@ -52,19 +53,26 @@ def _get_config() -> dict:
     return DEFAULT_CONFIG
 
 
-class TaskIDCompleter:
+class TaskIDCompleter(ac.completers.FilesCompleter):
     def __init__(self, incomplete_only: bool):
+        ac.completers.FilesCompleter.__init__(self, VALID_EXTENSIONS)
         self.incomplete_only = incomplete_only
 
-    def __call__(self, **_):
+    def __call__(self, **kwargs):
         # TODO: speed this up by filtering filenames before getting info using
         # prefix and ids
         frontmatter = _get_fm(["."], False)
         if self.incomplete_only:
             return [task['__id__'] for task in frontmatter if
-                    'done' not in task or not task['done']]
+                    'done' not in task or not task['done']] + \
+                list(
+                    ac.completers.FilesCompleter.__call__(self, **kwargs)
+            )
         else:
-            return [task['__id__'] for task in frontmatter]
+            return [task['__id__'] for task in frontmatter] + \
+                list(
+                    ac.completers.FilesCompleter.__call__(self, **kwargs)
+            )
 
 
 def _get_args() -> ap.Namespace:
@@ -196,7 +204,7 @@ def _get_fm(target_paths: list[str], non_recursive: bool) -> list[dict[str, Any]
     # Filter the files by those whose info was found and who have the proper
     # extensions.
     tm_files = [file for file in paths if os.path.isfile(
-        file) and os.path.splitext(file)[1] in ['.md', '.pmd', '.rmd', '.Rmd']
+        file) and os.path.splitext(file)[1] in VALID_EXTENSIONS
         and info[file] is not None]
 
     # Load the frontmatter for each file and create a dictionary including the
