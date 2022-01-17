@@ -167,8 +167,8 @@ def _get_args() -> ap.Namespace:
     done_parser.add_argument(
         "targets", nargs='+').completer = TaskIDCompleter(True)  # type: ignore
     done_parser.add_argument(
-        '-r', action=ap.BooleanOptionalAction, dest="recursive",
-        help="search for tasks recursively")
+        '-R', action=ap.BooleanOptionalAction, dest="non_recursive",
+        help="don't search for tasks recursively")
     done_parser.set_defaults(func=done)
 
     # TODO: add delete subcommand
