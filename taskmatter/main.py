@@ -349,8 +349,6 @@ def week(args: ap.Namespace) -> None:
     """The function corresponding to the `week` subcommand which prints the
     incomplete tasks for this week, or all tasks for this week if `-a` is
     specified."""
-    # TODO: Handle repeated tasks
-
     frontmatter = _get_fm(args.paths, args.non_recursive)
 
     today = dt.datetime.today().date()
@@ -417,8 +415,6 @@ def month(args: ap.Namespace) -> None:
     """The function corresponding to the `month` subcommand which prints the
     incomplete tasks for this month, or all tasks for this month if `-a` is
     specified."""
-    # TODO: Handle repeated tasks
-
     frontmatter = _get_fm(args.paths, args.non_recursive)
 
     today = dt.datetime.today().date()
@@ -536,8 +532,6 @@ def someday(args: ap.Namespace) -> None:
     """The function corresponding to the `someday` subcommand which prints the
     incomplete tasks without planned or due dates, or all tasks without planned
     or due dates if `-a` is specified."""
-    # TODO: Handle repeated tasks
-
     frontmatter = _get_fm(args.paths, args.non_recursive)
 
     filtered_frontmatter = [task for task in frontmatter if ('done' not in task
