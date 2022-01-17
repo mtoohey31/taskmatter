@@ -54,25 +54,20 @@ def _get_config() -> dict:
 
 
 class TaskIDCompleter(ac.completers.FilesCompleter):
-    def __init__(self, incomplete_only: bool):
+    def __init__(self):
         ac.completers.FilesCompleter.__init__(self, VALID_EXTENSIONS)
-        self.incomplete_only = incomplete_only
 
     def __call__(self, **kwargs):
-        # TODO: speed this up by filtering filenames before getting info using
-        # prefix and ids
-        frontmatter = _get_fm(["."], False)
-        if self.incomplete_only:
-            return [task['__id__'] for task in frontmatter if
-                    'done' not in task or not task['done']] + \
-                list(
-                    ac.completers.FilesCompleter.__call__(self, **kwargs)
-            )
-        else:
-            return [task['__id__'] for task in frontmatter] + \
-                list(
-                    ac.completers.FilesCompleter.__call__(self, **kwargs)
-            )
+        paths = ac.completers.FilesCompleter.__call__(self, **kwargs)
+
+        res = []
+        for path in paths:
+            info = _get_info(path)
+            if info is not None:
+                res.append(path)
+                res.append(info['__id__'])
+
+        return res
 
 
 def _get_args() -> ap.Namespace:
@@ -155,8 +150,7 @@ def _get_args() -> ap.Namespace:
     edit_parser = subparsers.add_parser('edit', aliases=['e'],
                                         help="edit the specified task")
     edit_parser.add_argument(
-        "targets", nargs='+'
-    ).completer = TaskIDCompleter(False)  # type: ignore
+        "targets", nargs='+').completer = TaskIDCompleter()  # type: ignore
     edit_parser.add_argument(
         '-R', action=ap.BooleanOptionalAction, dest="non_recursive",
         help="don't search for tasks recursively")
@@ -165,7 +159,7 @@ def _get_args() -> ap.Namespace:
     rename_parser = subparsers.add_parser('rename', aliases=['r'],
                                           help="rename the specified task")
     rename_parser.add_argument(
-        "target").completer = TaskIDCompleter(False)  # type: ignore
+        "target").completer = TaskIDCompleter()  # type: ignore
     rename_parser.add_argument(
         "title").completer = ac.completers.SuppressCompleter  # type: ignore
     rename_parser.set_defaults(func=rename)
@@ -173,8 +167,7 @@ def _get_args() -> ap.Namespace:
     delete_parser = subparsers.add_parser(
         'delete', aliases=['x'], help="delete the specified tasks")
     delete_parser.add_argument(
-        "targets", nargs='+'
-    ).completer = TaskIDCompleter(False)  # type: ignore
+        "targets", nargs='+').completer = TaskIDCompleter()  # type: ignore
     delete_parser.add_argument(
         '-R', action=ap.BooleanOptionalAction, dest="non_recursive",
         help="don't search for tasks recursively")
@@ -183,7 +176,7 @@ def _get_args() -> ap.Namespace:
     done_parser = subparsers.add_parser(
         'done', aliases=['d'], help="mark the specified tasks as done")
     done_parser.add_argument(
-        "targets", nargs='+').completer = TaskIDCompleter(True)  # type: ignore
+        "targets", nargs='+').completer = TaskIDCompleter()  # type: ignore
     done_parser.add_argument(
         '-R', action=ap.BooleanOptionalAction, dest="non_recursive",
         help="don't search for tasks recursively")
@@ -258,8 +251,6 @@ def _get_info(path: str) -> Union[dict[str, str], None]:
     title and id of the file."""
     # Strip the directories and extension from the path
     stem = os.path.splitext(os.path.basename(path))[0]
-
-    # TODO: Check for id conflicts here and resolve them with a helper function
 
     # Check if the stem matches the regex for an id
     if re.match(r'^.* \| [a-z]{3}$', stem):
