@@ -154,6 +154,14 @@ def _get_args() -> ap.Namespace:
         help="don't search for tasks recursively")
     edit_parser.set_defaults(func=edit)
 
+    rename_parser = subparsers.add_parser('rename', aliases=['r'],
+                                          help="rename the specified task")
+    rename_parser.add_argument(
+        "target").completer = TaskIDCompleter(False)  # type: ignore
+    rename_parser.add_argument(
+        "title").completer = ac.completers.SuppressCompleter  # type: ignore
+    rename_parser.set_defaults(func=rename)
+
     done_parser = subparsers.add_parser('done', aliases=['d'],
                                         help="mark the specified task as done")
     done_parser.add_argument(
@@ -163,7 +171,6 @@ def _get_args() -> ap.Namespace:
         help="search for tasks recursively")
     done_parser.set_defaults(func=done)
 
-    # TODO: add rename subcommand that gets the title
     # TODO: add delete subcommand
 
     ac.autocomplete(parser)
@@ -642,9 +649,6 @@ def add(args: ap.Namespace) -> None:
 def edit(args: ap.Namespace) -> None:
     """The function corresponding to the `edit` subcommand that edits the tasks
     with the given targets."""
-    # TODO: Handle recursive/non-recursive possibilities better by starting
-    # with a non-recursive check, informing the user if that did not succeed,
-    # then proceeding to a recursive check
     frontmatter = _get_fm(args.paths, args.non_recursive)
 
     # Iterate through each target provided
@@ -671,12 +675,71 @@ def edit(args: ap.Namespace) -> None:
             print(f'Could not find task "{target}"')
 
 
+def rename(args: ap.Namespace) -> None:
+    """The function corresponding to the `rename` command that changes the
+    title of a task."""
+    frontmatter = _get_fm(args.paths, args.non_recursive)
+
+    # Iterate through each target provided
+    # First check if the target is an id, if so, use the gathered
+    # frontmatter to find the corresponding path
+    if re.match(r'^[a-z]{3}$', args.target):
+        for item in frontmatter:
+            if item['__id__'] == args.target:
+                f = BytesIO()
+                file_fm = fm.load(item['__path__'])
+                file_fm.content = file_fm.content.replace(
+                    "# "+item['__title__'], "# "+args.title)
+                fm.dump(file_fm, f)
+
+                new_path = item['__path__'].replace(item['__title__'],
+                                                    args.title)
+
+                if os.path.exists(new_path):
+                    print(f'Path "{new_path}" already exists')
+                    return
+
+                with open(new_path, 'w') as file:
+                    file.write(f.getvalue().decode('utf8') + '\n')
+                os.remove(item['__path__'])
+
+                break
+        else:
+            print(f'No task with id: "{args.target}" found')
+    # If the target is not an id, but is a valid path, use the same logic
+    # as in the past case to merge properties and write the file
+    elif os.path.exists(args.target):
+        f = BytesIO()
+        file_fm = fm.load(args.target)
+
+        info = _get_info(args.target)
+        if info is None:
+            print(f'Could not get info for task "{args.target}"')
+            return
+
+        file_fm.content = file_fm.content.replace(
+            "# "+info['__title__'], "# "+args.title)
+        fm.dump(file_fm, f)
+
+        new_path = args.title + \
+            args.target.removeprefix(info['__title__'])
+
+        if os.path.exists(new_path):
+            print(f'Path "{new_path}" already exists')
+            return
+
+        with open(new_path, 'w') as file:
+            file.write(f.getvalue().decode('utf8') + '\n')
+        os.remove(args.target)
+    # Otherwise if none of the above worked, inform the user that the
+    # target was not found
+    else:
+        print(f'Could not parse task "{args.target}"')
+
+
 def done(args: ap.Namespace) -> None:
     """The function corresponding to the `done` command that marks the tasks
     with the given targets as done."""
-    # TODO: Handle recursive/non-recursive possibilities better by starting
-    # with a non-recursive check, informing the user if that did not succeed,
-    # then proceeding to a recursive check
     frontmatter = _get_fm(args.paths, args.non_recursive)
 
     # Iterate through each target provided
