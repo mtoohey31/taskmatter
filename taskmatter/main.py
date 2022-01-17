@@ -65,7 +65,12 @@ class TaskIDCompleter(ac.completers.FilesCompleter):
             info = _get_info(path)
             if info is not None:
                 res.append(path)
-                res.append(info['__id__'])
+
+        for _, _, files in os.walk('.'):
+            for file in files:
+                info = _get_info(file)
+                if info is not None:
+                    res.append(info['__id__'])
 
         return res
 
