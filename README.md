@@ -31,6 +31,8 @@ All task properties are stored under the `_tm` key in the markdown file's YAML f
 | `someday` | `s`          | List all tasks with no planned or due date.             |
 | `add`     | `a`          | Add a new task with the specified name and properties.  |
 | `edit`    | `e`          | Edit the task(s) with the specified id or path.         |
+| `rename`  | `r`          | Rename the task with the specified id or path.          |
+| `delete`  | `x`          | Delete task(s) with the specified id or path as done.   |
 | `done`    | `d`          | Mark the task(s) with the specified id or path as done. |
 
 Note that `week` is the default subcommand, so when `taskmatter` is run with no arguments, it will behave identically to `taskmatter month`.
