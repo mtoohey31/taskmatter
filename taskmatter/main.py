@@ -475,7 +475,7 @@ def month(args: ap.Namespace) -> None:
 
     if month:
         print(
-            _format_month_table(month, weekdays, month_start.strftime('%B')))
+            _format_month_table(month, weekdays, target.strftime('%B')))
 
 
 def _format_month_table(month: list[list[dict[str, Any]]], weekdays: list[dict],
