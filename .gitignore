@@ -1,3 +1,5 @@
 /build
 /completions
 /taskmatter.egg-info
+/result
+**/__pycache__/

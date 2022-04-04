@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import os
 import re
 from typing import Union, Any
@@ -825,7 +823,3 @@ def done(args: ap.Namespace) -> None:
         # target was not found
         else:
             print(f'Could not parse task "{target}"')
-
-
-if __name__ == '__main__':
-    main()
