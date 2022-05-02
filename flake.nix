@@ -2,23 +2,30 @@
   description = "Taskmatter";
 
   inputs = {
-    flake-utils.url = "github:numtide/flake-utils";
-    nixpkgs.url = "nixpkgs/nixos-unstable";
+    nixpkgs.url = "nixpkgs/nixpkgs-unstable";
+    utils.url = "github:numtide/flake-utils";
     poetry2nix.url = "github:nix-community/poetry2nix";
   };
 
-  outputs = { self, nixpkgs, flake-utils, poetry2nix }:
-    {
-      overlay = nixpkgs.lib.composeManyExtensions [
+  outputs = { self, nixpkgs, utils, poetry2nix }:
+    utils.lib.eachDefaultSystem
+      (system:
+        let pkgs = import nixpkgs {
+          inherit system;
+          overlays = [ poetry2nix.overlay ];
+        }; in
+        with pkgs; rec {
+          packages.default = pkgs.poetry2nix.mkPoetryApplication {
+            projectDir = ./.;
+          };
+
+          devShells.default = pkgs.poetry2nix.mkPoetryEnv {
+            projectDir = ./.;
+          };
+        }) // {
+      overlays.default = nixpkgs.lib.composeManyExtensions [
         poetry2nix.overlay
-        (self: super: {
-          taskmatter = super.poetry2nix.mkPoetryApplication { projectDir = ./.; };
-        })
+        (final: _: { taskmatter = self.packages."${final.system}".default; })
       ];
-    } // flake-utils.lib.eachDefaultSystem (system: {
-      defaultPackage = (import nixpkgs {
-        inherit system;
-        overlays = [ self.overlay ];
-      }).taskmatter;
-    });
+    };
 }
