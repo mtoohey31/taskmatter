@@ -235,18 +235,22 @@ def _get_paths(paths: list[str], input_paths: list[str],
         # Check whether the path is a file
         if os.path.isfile(path):
             paths.append(path)
-        else:
-            # If it's not a file, iterate through each path inside the
-            # directory
-            for sub_path in os.listdir(path):
-                # If the path is a file, add it to the paths
-                if non_recursive and os.path.isfile(sub_path):
-                    paths.append(sub_path)
-                # Otherwise, if the recursive argument was passed, call this
-                # method recursively
-                else:
-                    _get_paths(paths, [os.path.join(path, sub_path)],
-                               non_recursive)
+            continue
+
+        basename = os.path.basename(path)
+        if len(basename) > 0 and basename[0] == "." or not os.path.isdir(path):
+            continue
+
+        # Iterate through each path inside the directory
+        for sub_path in os.listdir(path):
+            # If the path is a file, add it to the paths
+            if non_recursive and os.path.isfile(sub_path):
+                paths.append(sub_path)
+            # Otherwise, if the recursive argument was passed, call this
+            # method recursively
+            else:
+                _get_paths(paths, [os.path.join(path, sub_path)],
+                           non_recursive)
 
 
 def _get_info(path: str) -> Union[dict[str, str], None]:
