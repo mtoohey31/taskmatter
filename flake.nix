@@ -10,26 +10,25 @@
     overlays.default = final: prev: {
       taskmatter = final.poetry2nix.mkPoetryApplication {
         projectDir = ./.;
+        overrides = final.poetry2nix.overrides.withDefaults (_: prev: {
+          monthdelta = prev.monthdelta.overridePythonAttrs (oldAttrs: {
+            propagatedBuildInputs = oldAttrs.propagatedBuildInputs ++ [
+              prev.setuptools
+            ];
+          });
+        });
       };
     };
-  } // utils.lib.eachDefaultSystem (system:
-    let
-      pkgs = import nixpkgs {
-        overlays = [ self.overlays.default ];
-        inherit system;
-      };
-    in
-    with pkgs; {
-      packages.default = taskmatter;
+  } // utils.lib.eachDefaultSystem (system: with import nixpkgs
+    { overlays = [ self.overlays.default ]; inherit system; }; {
+    packages.default = taskmatter;
 
-      devShells.default = (pkgs.poetry2nix.mkPoetryEnv {
-        projectDir = ./.;
-      }).overrideAttrs (oldAttrs: {
-        nativeBuildInputs = oldAttrs.nativeBuildInputs ++ [
-          poetry
-          python3
-          python3Packages.python-lsp-server
-        ];
-      });
+    devShells.default = taskmatter.dependencyEnv.overrideAttrs (oldAttrs: {
+      nativeBuildInputs = oldAttrs.nativeBuildInputs ++ [
+        poetry
+        python3
+        python3Packages.python-lsp-server
+      ];
     });
+  });
 }
