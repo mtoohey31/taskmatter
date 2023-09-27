@@ -238,7 +238,7 @@ def _get_paths(paths: list[str], input_paths: list[str],
             continue
 
         basename = os.path.basename(path)
-        if len(basename) > 0 and basename[0] == "." or not os.path.isdir(path):
+        if len(basename) > 0 and basename[0] == ".":
             continue
 
         # Iterate through each path inside the directory
