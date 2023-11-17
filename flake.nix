@@ -4,19 +4,32 @@
   inputs = {
     nixpkgs.url = "nixpkgs/nixpkgs-unstable";
     utils.url = "github:numtide/flake-utils";
+    poetry2nix = {
+      url = "github:nix-community/poetry2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, utils }: {
-    overlays.default = final: prev: {
-      taskmatter = final.poetry2nix.mkPoetryApplication {
-        projectDir = ./.;
-        overrides = final.poetry2nix.overrides.withDefaults (_: prev: {
-          monthdelta = prev.monthdelta.overridePythonAttrs (oldAttrs: {
-            propagatedBuildInputs = oldAttrs.propagatedBuildInputs ++ [
-              prev.setuptools
-            ];
+  outputs = { self, nixpkgs, utils, poetry2nix }: {
+    overlays = rec {
+      expects-poetry2nix = final: prev: {
+        taskmatter = final.poetry2nix.mkPoetryApplication {
+          projectDir = ./.;
+          overrides = final.poetry2nix.overrides.withDefaults (_: prev: {
+            monthdelta = prev.monthdelta.overridePythonAttrs (oldAttrs: {
+              propagatedBuildInputs = oldAttrs.propagatedBuildInputs ++ [
+                prev.setuptools
+              ];
+            });
           });
-        });
+        };
+      };
+
+      default = _: prev: {
+        inherit (prev.appendOverlays [
+          poetry2nix.overlays.default
+          expects-poetry2nix
+        ]) taskmatter;
       };
     };
   } // utils.lib.eachDefaultSystem (system: with import nixpkgs
