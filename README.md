@@ -4,14 +4,6 @@ A task management tool that stores tasks as markdown files with properties in th
 
 ![screenshot](https://user-images.githubusercontent.com/36740602/149677423-c6cb4b8d-8098-4bfe-9ab1-ddb157708a0d.png)
 
-## Installation
-
-```sh
-pip3 install git+https://github.com/mtoohey31/taskmatter.git#egg=taskmatter
-```
-
-See [releases](https://github.com/mtoohey31/taskmatter/releases) for shell completion files.
-
 ## Task Properties
 
 All task properties are stored under the `_tm` key in the markdown file's YAML front-matter, which includes an underscore in an attempt to indicate that the key should not be modified by other programs, using [Python's private variable syntax](https://docs.python.org/3/tutorial/classes.html#private-variables).
@@ -35,7 +27,7 @@ All task properties are stored under the `_tm` key in the markdown file's YAML f
 | `delete`  | `x`          | Delete task(s) with the specified id or path as done.   |
 | `done`    | `d`          | Mark the task(s) with the specified id or path as done. |
 
-Note that `week` is the default subcommand, so when `taskmatter` is run with no arguments, it will behave identically to `taskmatter month`.
+Note that `month` is the default subcommand, so when `taskmatter` is run with no arguments, it will behave identically to `taskmatter month`.
 
 ## Syncing
 

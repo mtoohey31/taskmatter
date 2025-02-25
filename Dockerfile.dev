@@ -1,0 +1,14 @@
+FROM docker.io/library/swift:6.0.3
+
+RUN apt update
+RUN apt install xz-utils wget
+
+RUN swift sdk install https://download.swift.org/swift-6.0.3-release/static-sdk/swift-6.0.3-RELEASE/swift-6.0.3-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz --checksum 67f765e0030e661a7450f7e4877cfe008db4f57f177d5a08a6e26fd661cdd0bd
+
+WORKDIR /opt
+
+RUN wget https://github.com/helix-editor/helix/releases/download/25.01.1/helix-25.01.1-x86_64-linux.tar.xz
+RUN tar xf helix-25.01.1-x86_64-linux.tar.xz
+RUN ln -s /opt/helix-25.01.1-x86_64-linux/hx /usr/bin/hx
+
+WORKDIR /usr/src/taskmatter
