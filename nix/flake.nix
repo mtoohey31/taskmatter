@@ -11,6 +11,8 @@
       default = final: _: {
         taskmatter =
           final.callPackage ./pkgs/by-name/ta/taskmatter/package.nix { };
+        taskmatter-bin =
+          final.callPackage ./pkgs/by-name/ta/taskmatter-bin/package.nix { };
       };
     };
   } // flake-utils.lib.eachDefaultSystem (system:
@@ -20,10 +22,10 @@
         inherit system;
       };
       inherit (pkgs) mkShell sourcekit-lsp swift swiftPackages swiftpm2nix
-        swift-format taskmatter;
+        swift-format taskmatter-bin;
     in
     {
-      packages.default = taskmatter;
+      packages.default = taskmatter-bin;
 
       devShells.default = (mkShell.override { inherit (swift) stdenv; }) {
         packages = [ sourcekit-lsp swift swiftpm2nix swift-format ];
