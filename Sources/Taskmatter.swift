@@ -32,16 +32,9 @@ let calendar = { () in
     return calendar
 }()
 
-func getDateFormatter() -> DateFormatter {
-    let formatter = DateFormatter()
-    // formatter.defaultDate = calendar.date(
-    //     from: DateComponents(timeZone: TimeZone.current, hour: -5))
-    return formatter
-}
-
 extension Date {
     init(fromTaskmatterString from: String) throws(UnrecognizedDate) {
-        let formatter = getDateFormatter()
+        let formatter = DateFormatter()
         formatter.dateFormat = taskmatterDateTimeFormat
         if let date = formatter.date(from: from) {
             self = date
@@ -58,7 +51,7 @@ extension Date {
 
 extension Date {
     var taskmatterString: String {
-        let formatter = getDateFormatter()
+        let formatter = DateFormatter()
         formatter.dateFormat = taskmatterDateFormat
 
         let components = calendar.dateComponents(in: TimeZone.gmt, from: self)
@@ -73,7 +66,7 @@ extension Date {
     }
 
     var taskmatterTimeString: String? {
-        let formatter = getDateFormatter()
+        let formatter = DateFormatter()
 
         let components = calendar.dateComponents(in: TimeZone.gmt, from: self)
         if components.hour == 0 && components.minute == 0 {
@@ -298,7 +291,7 @@ struct Week: ParsableCommand {
         tasks.sort { $0.date! <= $1.date! }
 
         var days = [(String, [String])]()
-        let formatter = getDateFormatter()
+        let formatter = DateFormatter()
         formatter.dateFormat = "EEEE, MMM d"
         var day = week.start
         while day < week.end {
@@ -422,7 +415,7 @@ struct Month: ParsableCommand {
         }
         tasks.sort { $0.date! <= $1.date! }
 
-        let formatter = getDateFormatter()
+        let formatter = DateFormatter()
         formatter.dateFormat = "EEEE"
         var day = month.start
 
