@@ -10,9 +10,6 @@ let package = Package(
         .package(
             url: "https://github.com/woodymelling/swift-frontmatter-parsing",
             revision: "b8b635afe8e0b94f75fe3083ea0238da418ca8e8"),
-        .package(
-            url: "https://github.com/jpsim/Yams",
-            from: "5.0.0"),
     ],
     targets: [
         .executableTarget(
@@ -20,7 +17,6 @@ let package = Package(
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "FrontmatterParsing", package: "swift-frontmatter-parsing"),
-                .product(name: "Yams", package: "yams"),
             ],
             path: "Sources")
     ]
