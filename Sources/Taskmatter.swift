@@ -724,17 +724,26 @@ func findTargets(targets: [String], common: CommonOptions) throws(FindTargetsErr
     return res.map { $0! }
 }
 
-struct ExecvpFailedError: Error {
-    let errno: Int32
+enum EditorError: Error {
+    case editorUnset
+    case strdupFailed
+    case execvpFailed(Int32)
 }
 
-extension ExecvpFailedError: LocalizedError {
+extension EditorError: LocalizedError {
     var errorDescription: String? {
-        if let error = strerror(self.errno) {
-            return "execvp failed with error: \(String(cString: error))"
+        switch self {
+        case .editorUnset:
+            "$EDITOR was unset"
+        case .strdupFailed:
+            "strdup failed, possible out of memory error"
+        case .execvpFailed(let errno):
+            if let error = strerror(errno) {
+                "execvp failed with error: \(String(cString: error))"
+            } else {
+                "execvp failed with unknown errno \(errno)"
+            }
         }
-
-        return "execvp failed with unknown errno \(self.errno)"
     }
 }
 
@@ -750,9 +759,14 @@ struct Edit: ParsableCommand {
 
     mutating func run() throws {
         let urls = try findTargets(targets: self.targets, common: self.common)
-        let editor = strdup(ProcessInfo.processInfo.environment["EDITOR"])
-        execvp(editor, [editor] + urls.map { strdup($0.path) } + [nil])
-        throw ExecvpFailedError(errno: errno)
+        guard let editor = ProcessInfo.processInfo.environment["EDITOR"] else {
+            throw EditorError.editorUnset
+        }
+        guard let editorCString = strdup(editor) else {
+            throw EditorError.strdupFailed
+        }
+        execvp(editorCString, [editorCString] + urls.map { strdup($0.path) } + [nil])
+        throw EditorError.execvpFailed(errno)
     }
 }
 
