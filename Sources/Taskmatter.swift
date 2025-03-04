@@ -662,36 +662,6 @@ struct Add: ParsableCommand {
     }
 }
 
-enum LookPathError: Error {
-    case pathUnset
-    case notFound(String)
-}
-
-extension LookPathError: LocalizedError {
-    var errorDescription: String? {
-        switch self {
-        case .pathUnset:
-            "$PATH was unset"
-        case .notFound(let name):
-            "binary \"\(name)\" was not found in $PATH"
-        }
-    }
-}
-
-func lookPath(_ name: String) throws(LookPathError) -> URL {
-    guard let path = ProcessInfo.processInfo.environment["PATH"] else {
-        throw .pathUnset
-    }
-    for dir in path.components(separatedBy: ":") {
-        let url = URL(fileURLWithPath: dir).appendingPathComponent(name)
-        if FileManager.default.fileExists(atPath: url.path) {
-            return url
-        }
-    }
-
-    throw .notFound(name)
-}
-
 enum FindTargetsError: Error {
     case duplicateID(String)
     case notIDOrPath(String)
